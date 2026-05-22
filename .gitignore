@@ -1,0 +1,11 @@
+node_modules/
+dist/
+target/
+*.db
+*.db-journal
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

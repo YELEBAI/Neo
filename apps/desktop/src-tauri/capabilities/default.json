@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "description": "Default capability for NeoTavern",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open"
+  ]
+}

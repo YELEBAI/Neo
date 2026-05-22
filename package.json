@@ -1,0 +1,17 @@
+{
+  "name": "neo-tavern-demo",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @neo-tavern/desktop dev",
+    "build": "pnpm --filter @neo-tavern/desktop build",
+    "tauri": "pnpm --filter @neo-tavern/desktop tauri"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@neo-tavern/shared": ["../../packages/shared/src/index.ts"],
+      "@neo-tavern/shared/*": ["../../packages/shared/src/*"],
+      "@neo-tavern/core": ["../../packages/core/src/index.ts"],
+      "@neo-tavern/core/*": ["../../packages/core/src/*"],
+      "@neo-tavern/ui": ["../../packages/ui/src/index.ts"],
+      "@neo-tavern/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/core" },
+    { "path": "../../packages/ui" }
+  ]
+}
