@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, Plug, Sun, Moon, Monitor, Palette, Trash2, Plus, Regex, SlidersHorizontal, CheckCircle2, Globe, Download } from 'lucide-react'
+import { ArrowLeft, Save, Plug, Sun, Moon, Monitor, Palette, Trash2, Plus, Regex, SlidersHorizontal, CheckCircle2, Globe, Download, KeyRound, Server, Zap } from 'lucide-react'
 import { Button, Input, Label, Card, CardContent, CardHeader, CardTitle, CardDescription, ScrollArea, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@neo-tavern/ui'
 import { useSettingsStore } from '@/features/settings/settings.store'
 import { useTheme } from '@/app/theme'
@@ -14,7 +14,7 @@ function toast(type: 'success' | 'error' | 'info', message: string) {
 type Section = 'api' | 'appearance' | 'regex' | 'context'
 
 const sections: { key: Section; icon: typeof Plug; label: string }[] = [
-  { key: 'api', icon: Plug, label: 'API Connection' },
+  { key: 'api', icon: Plug, label: 'DeepSeek API' },
   { key: 'appearance', icon: Palette, label: 'Appearance' },
   { key: 'context', icon: SlidersHorizontal, label: 'Context' },
   { key: 'regex', icon: Regex, label: 'Regex Rules' },
@@ -25,6 +25,26 @@ const themes = [
   { value: 'dark' as const, icon: Moon, label: 'Dark' },
   { value: 'system' as const, icon: Monitor, label: 'System' },
 ]
+
+const DEEPSEEK_BASE_URL = 'https://api.deepseek.com'
+const DEFAULT_DEEPSEEK_MODEL = 'deepseek-v4-flash'
+const DEFAULT_DEEPSEEK_CONFIG_NAME = 'DeepSeek V4 Flash'
+const DEEPSEEK_LEGACY_MODELS = ['deepseek-chat', 'deepseek-reasoner']
+
+const DEEPSEEK_MODEL_OPTIONS = [
+  {
+    id: 'deepseek-v4-flash',
+    label: 'DeepSeek V4 Flash',
+    badge: 'Fast',
+    description: 'Default choice for responsive chats and roleplay.',
+  },
+  {
+    id: 'deepseek-v4-pro',
+    label: 'DeepSeek V4 Pro',
+    badge: 'Pro',
+    description: 'Use for heavier reasoning, coding, and complex writing.',
+  },
+] as const
 
 function fillForm(cfg: {
   name: string; baseUrl: string; apiKey: string; model: string
@@ -83,7 +103,7 @@ export function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState('0.8')
-  const [maxTokens, setMaxTokens] = useState('800')
+  const [maxTokens, setMaxTokens] = useState('4096')
   const [reasoningEffort, setReasoningEffort] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [selectedId, setSelectedId] = useState<string>('__new__')
@@ -113,6 +133,17 @@ export function SettingsPage() {
   const [regexEnabled, setRegexEnabled] = useState(true)
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null)
 
+  const resetDeepSeekForm = () => {
+    setName(DEFAULT_DEEPSEEK_CONFIG_NAME)
+    setBaseUrl(DEEPSEEK_BASE_URL)
+    setApiKey('')
+    setModel(DEFAULT_DEEPSEEK_MODEL)
+    setTemperature('0.8')
+    setMaxTokens('4096')
+    setReasoningEffort('')
+    setAvailableModels([])
+  }
+
   useEffect(() => {
     let cancelled = false
     const load = async () => {
@@ -125,6 +156,7 @@ export function SettingsPage() {
         setSelectedId(c.id)
       } else {
         setSelectedId('__new__')
+        resetDeepSeekForm()
       }
       setLoaded(true)
     }
@@ -139,12 +171,7 @@ export function SettingsPage() {
   const applyConfigSelection = (id: string) => {
     setSelectedId(id)
     if (id === '__new__') {
-      setName('')
-      setBaseUrl('')
-      setApiKey('')
-      setModel('')
-      setTemperature('0.8')
-      setMaxTokens('800')
+      resetDeepSeekForm()
       return
     }
     const cfg = modelConfigs.find((c) => c.id === id)
@@ -157,15 +184,31 @@ export function SettingsPage() {
   const handleSave = async () => {
     try {
       const temp = parseFloat(temperature) || 0.8
-      const tokens = parseInt(maxTokens) || 800
+      const tokens = parseInt(maxTokens) || 4096
       const re = reasoningEffort || undefined
+      const nextName = name.trim() || DEFAULT_DEEPSEEK_CONFIG_NAME
+      const nextBaseUrl = baseUrl.trim() || DEEPSEEK_BASE_URL
+      const nextApiKey = apiKey.trim()
+      const nextModel = model.trim() || DEFAULT_DEEPSEEK_MODEL
+      if (!nextApiKey) {
+        toast('error', 'Please enter your DeepSeek API key first.')
+        return
+      }
       if (selectedId !== '__new__' && modelConfigs.some((c) => c.id === selectedId)) {
-        await updateModelConfig(selectedId, { baseUrl, apiKey, model, name, temperature: temp, maxTokens: tokens, reasoningEffort: re })
-        toast('success', `"${name || 'Configuration'}" updated.`)
+        await updateModelConfig(selectedId, { baseUrl: nextBaseUrl, apiKey: nextApiKey, model: nextModel, name: nextName, temperature: temp, maxTokens: tokens, reasoningEffort: re })
+        setName(nextName)
+        setBaseUrl(nextBaseUrl)
+        setApiKey(nextApiKey)
+        setModel(nextModel)
+        toast('success', `"${nextName}" updated.`)
       } else {
-        const cfg = await saveModelConfig({ provider: 'openai-compatible', baseUrl, apiKey, model, name, temperature: temp, maxTokens: tokens, reasoningEffort: re })
+        const cfg = await saveModelConfig({ provider: 'openai-compatible', baseUrl: nextBaseUrl, apiKey: nextApiKey, model: nextModel, name: nextName, temperature: temp, maxTokens: tokens, reasoningEffort: re })
+        setName(nextName)
+        setBaseUrl(nextBaseUrl)
+        setApiKey(nextApiKey)
+        setModel(nextModel)
         setSelectedId(cfg.id)
-        toast('success', `"${name || 'Configuration'}" saved.`)
+        toast('success', `"${nextName}" saved.`)
       }
     } catch {
       toast('error', error || 'Failed to save configuration.')
@@ -183,8 +226,7 @@ export function SettingsPage() {
         fillForm(state.modelConfig)
         setSelectedId(state.modelConfig.id)
       } else {
-        setName(''); setBaseUrl(''); setApiKey(''); setModel('')
-        setTemperature('0.8'); setMaxTokens('800')
+        resetDeepSeekForm()
         setSelectedId('__new__')
       }
       toast('info', `"${cfg.name || 'Configuration'}" deleted.`)
@@ -194,26 +236,42 @@ export function SettingsPage() {
   }
 
   const handleTestConnection = async () => {
-    if (!baseUrl.trim()) { toast('error', 'Please enter a Base URL first.'); return }
-    const result = await testConnection(baseUrl, apiKey, model || 'gpt-4o-mini')
+    const nextBaseUrl = baseUrl.trim() || DEEPSEEK_BASE_URL
+    const nextApiKey = apiKey.trim()
+    const nextModel = model.trim() || DEFAULT_DEEPSEEK_MODEL
+    if (!nextApiKey) {
+      toast('error', 'Please enter your DeepSeek API key first.')
+      return
+    }
+    setBaseUrl(nextBaseUrl)
+    setModel(nextModel)
+    const result = await testConnection(nextBaseUrl, nextApiKey, nextModel)
     if (result.ok) toast('success', result.message)
     else toast('error', result.message)
   }
 
   const handleFetchModels = async () => {
-    if (!baseUrl.trim()) { toast('error', 'Please enter a Base URL first.'); return }
+    const nextBaseUrl = baseUrl.trim() || DEEPSEEK_BASE_URL
+    const nextApiKey = apiKey.trim()
+    if (!nextApiKey) {
+      toast('error', 'Please enter your DeepSeek API key first.')
+      return
+    }
+    setBaseUrl(nextBaseUrl)
     setFetchingModels(true)
     try {
-      const response = await fetch(`${baseUrl.replace(/\/$/, '')}/models`, {
-        headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      const response = await fetch(`${nextBaseUrl.replace(/\/$/, '')}/models`, {
+        headers: { Authorization: `Bearer ${nextApiKey}` },
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const data = await response.json() as { data?: Array<{ id: string }> }
       const models = (data.data || []).map((m) => m.id).sort((a, b) => a.localeCompare(b))
-      if (models.length === 0) { toast('error', 'No models returned from API'); return }
+      if (models.length === 0) { toast('error', 'No DeepSeek models returned from API'); return }
       setAvailableModels(models)
-      if (!model || !models.includes(model)) setModel(models[0])
-      toast('success', `Loaded ${models.length} models`)
+      if (!model || !models.includes(model)) {
+        setModel(models.includes(DEFAULT_DEEPSEEK_MODEL) ? DEFAULT_DEEPSEEK_MODEL : models[0])
+      }
+      toast('success', `Loaded ${models.length} DeepSeek models`)
     } catch (err) {
       toast('error', `Failed: ${(err as Error).message}`)
     } finally {
@@ -236,6 +294,18 @@ export function SettingsPage() {
 
   const selectedRegexPreset = regexPresets.find((p) => p.id === selectedRegexPresetId) ?? null
   const selectedRules = selectedRegexPreset ? [...selectedRegexPreset.rules] : []
+  const fetchedModelOptions = availableModels.map((id) => ({
+    id,
+    label: id,
+    badge: 'Fetched',
+    description: 'Returned by DeepSeek /models.',
+  }))
+  const baseModelOptions = availableModels.length > 0 ? fetchedModelOptions : [...DEEPSEEK_MODEL_OPTIONS]
+  const modelSelectOptions = model && !baseModelOptions.some((option) => option.id === model)
+    ? [{ id: model, label: model, badge: 'Saved', description: 'Saved custom model id.' }, ...baseModelOptions]
+    : baseModelOptions
+  const selectedModelMeta = DEEPSEEK_MODEL_OPTIONS.find((option) => option.id === model)
+  const isLegacyDeepSeekModel = DEEPSEEK_LEGACY_MODELS.includes(model)
 
   const handleSelectRegexPreset = (id: string) => {
     setSelectedRegexPresetId(id)
@@ -361,108 +431,202 @@ export function SettingsPage() {
 
       <div className="flex-1 p-6 overflow-auto">
         {section === 'api' && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Plug className="h-5 w-5" />API Connection</CardTitle>
-              <CardDescription>Configure your OpenAI-compatible API endpoint. Save multiple configs and switch between them.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!loaded && <p className="text-sm text-muted-foreground animate-pulse">Loading saved configurations...</p>}
-
-              <div>
-                <Label htmlFor="config-select">Saved Configurations</Label>
-                <div className="flex gap-2">
-                  <select id="config-select" value={selectedId} onChange={(e) => applyConfigSelection(e.target.value)}
-                    className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="__new__">+ New Configuration</option>
-                    {modelConfigs.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name || c.model || c.id.slice(0, 8)}</option>
-                    ))}
-                  </select>
-                  {selectedId !== '__new__' && (
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive shrink-0">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+          <div className="max-w-5xl space-y-4">
+            <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                  <span className="h-2 w-2 rounded-full bg-primary" />
+                  DeepSeek dedicated
                 </div>
-                {selectedId !== '__new__' && activeConfigId === selectedId && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">Active — used in chats</p>
-                )}
+                <div>
+                  <h1 className="flex items-center gap-2 text-2xl font-bold tracking-normal">
+                    <Plug className="h-6 w-6" />DeepSeek Connection
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Optimized for DeepSeek&apos;s OpenAI-compatible chat endpoint and current V4 models.
+                  </p>
+                </div>
               </div>
+              <div className="grid gap-2 text-xs sm:grid-cols-2 lg:min-w-[340px]">
+                <div className="rounded-md border px-3 py-2">
+                  <p className="text-muted-foreground">Official base</p>
+                  <p className="mt-1 truncate font-mono text-foreground">{DEEPSEEK_BASE_URL}</p>
+                </div>
+                <div className="rounded-md border px-3 py-2">
+                  <p className="text-muted-foreground">Current default</p>
+                  <p className="mt-1 truncate font-mono text-foreground">{DEFAULT_DEEPSEEK_MODEL}</p>
+                </div>
+              </div>
+            </div>
 
-              <div>
-                <Label htmlFor="config-name">Configuration Name</Label>
-                <Input id="config-name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder="My API Config" />
-              </div>
-              <div>
-                <Label htmlFor="base-url">Base URL</Label>
-                <Input id="base-url" value={baseUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
-                <p className="text-xs text-muted-foreground mt-1">e.g. https://api.openai.com/v1 or http://localhost:11434/v1 for Ollama</p>
-              </div>
-              <div>
-                <Label htmlFor="api-key">API Key</Label>
-                <Input id="api-key" type="password" value={apiKey} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)} placeholder="sk-..." />
-              </div>
-              <div>
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="model">Model</Label>
-                    {availableModels.length > 0 ? (
-                      <select id="model" value={model} onChange={(e) => setModel(e.target.value)}
-                        className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            {!loaded && <p className="text-sm text-muted-foreground animate-pulse">Loading saved DeepSeek profiles...</p>}
+
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5" />Connection Profile</CardTitle>
+                  <CardDescription>Save one or more DeepSeek keys and switch the active profile used by chats.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label htmlFor="config-select">DeepSeek Profiles</Label>
+                    <div className="flex gap-2">
+                      <select id="config-select" value={selectedId} onChange={(e) => applyConfigSelection(e.target.value)}
+                        className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       >
-                        {availableModels.map((m) => (
-                          <option key={m} value={m}>{m}</option>
+                        <option value="__new__">+ New DeepSeek Profile</option>
+                        {modelConfigs.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name || c.model || c.id.slice(0, 8)}</option>
                         ))}
                       </select>
-                    ) : (
-                      <Input id="model" value={model} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setModel(e.target.value)} placeholder="gpt-4o-mini" />
+                      {selectedId !== '__new__' && (
+                        <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive shrink-0">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                    {selectedId !== '__new__' && activeConfigId === selectedId && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">Active — used in chats</p>
                     )}
                   </div>
-                  <Button variant="outline" size="sm" onClick={handleFetchModels} disabled={fetchingModels} className="shrink-0">
-                    <Download className="h-3.5 w-3.5 mr-1" />{fetchingModels ? 'Loading...' : 'Fetch'}
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label htmlFor="config-name">Profile Name</Label>
+                      <Input id="config-name" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)} placeholder={DEFAULT_DEEPSEEK_CONFIG_NAME} />
+                    </div>
+                    <div>
+                      <Label htmlFor="api-key">DeepSeek API Key</Label>
+                      <Input id="api-key" type="password" value={apiKey} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)} placeholder="sk-..." />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="base-url">DeepSeek Base URL</Label>
+                      <Button variant="ghost" size="sm" onClick={() => setBaseUrl(DEEPSEEK_BASE_URL)}>Use Official</Button>
+                    </div>
+                    <div className="relative">
+                      <Server className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input id="base-url" value={baseUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaseUrl(e.target.value)} placeholder={DEEPSEEK_BASE_URL} className="pl-9 font-mono text-xs" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Chat requests are sent to /chat/completions.</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><Zap className="h-5 w-5" />DeepSeek Model</CardTitle>
+                  <CardDescription>Choose the hosted model for chat generation.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    {DEEPSEEK_MODEL_OPTIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => {
+                          setModel(option.id)
+                          if (!name.trim() || name.startsWith('DeepSeek')) setName(option.label)
+                        }}
+                        className={`rounded-md border p-3 text-left transition-colors ${model === option.id ? 'border-primary bg-primary/10 text-foreground' : 'border-border hover:bg-accent/50'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium">{option.label}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${model === option.id ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{option.badge}</span>
+                        </div>
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">{option.id}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{option.description}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <Label htmlFor="model">Model ID</Label>
+                    <div className="flex gap-2">
+                      <select id="model" value={model} onChange={(e) => setModel(e.target.value)}
+                        className="min-w-0 flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {modelSelectOptions.map((option) => (
+                          <option key={option.id} value={option.id}>{option.id}</option>
+                        ))}
+                      </select>
+                      <Button variant="outline" size="sm" onClick={handleFetchModels} disabled={fetchingModels} className="shrink-0">
+                        <Download className="h-3.5 w-3.5 mr-1" />{fetchingModels ? 'Loading...' : 'Fetch'}
+                      </Button>
+                    </div>
+                    {selectedModelMeta && (
+                      <p className="text-xs text-muted-foreground mt-1">{selectedModelMeta.description}</p>
+                    )}
+                    {availableModels.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">{availableModels.length} DeepSeek models available</p>
+                    )}
+                    {isLegacyDeepSeekModel && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">Legacy alias — switch to deepseek-v4-flash or deepseek-v4-pro before July 24, 2026.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><SlidersHorizontal className="h-5 w-5" />Generation Defaults</CardTitle>
+                <CardDescription>DeepSeek V4 supports long context and optional reasoning effort.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div>
+                    <Label htmlFor="temperature">Temperature</Label>
+                    <Input id="temperature" value={temperature} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTemperature(e.target.value)} placeholder="0.8" type="number" step="0.1" min="0" max="2" />
+                  </div>
+                  <div>
+                    <Label htmlFor="max-tokens">Max Output Tokens</Label>
+                    <Input id="max-tokens" value={maxTokens} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxTokens(e.target.value)} placeholder="4096" type="number" min="1" max="384000" />
+                  </div>
+                  <div>
+                    <Label htmlFor="reasoning-effort">Reasoning Effort</Label>
+                    <select
+                      id="reasoning-effort"
+                      value={reasoningEffort}
+                      onChange={(e) => setReasoningEffort(e.target.value)}
+                      className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="">Default</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid gap-2 text-xs md:grid-cols-3">
+                  <div className="rounded-md border px-3 py-2">
+                    <p className="text-muted-foreground">Context length</p>
+                    <p className="mt-1 text-sm font-semibold">1M tokens</p>
+                  </div>
+                  <div className="rounded-md border px-3 py-2">
+                    <p className="text-muted-foreground">Max output</p>
+                    <p className="mt-1 text-sm font-semibold">384K tokens</p>
+                  </div>
+                  <div className="rounded-md border px-3 py-2">
+                    <p className="text-muted-foreground">Format</p>
+                    <p className="mt-1 text-sm font-semibold">OpenAI Chat</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button onClick={handleSave} disabled={saving} className="flex-1">
+                    <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save DeepSeek Profile'}
+                  </Button>
+                  <Button variant="outline" onClick={handleTestConnection} disabled={testing} className="sm:min-w-[160px]">
+                    <Plug className="h-4 w-4 mr-2" />{testing ? 'Testing...' : 'Test Connection'}
                   </Button>
                 </div>
-                {availableModels.length > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">{availableModels.length} models available</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="temperature">Temperature</Label>
-                  <Input id="temperature" value={temperature} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTemperature(e.target.value)} placeholder="0.8" type="number" step="0.1" min="0" max="2" />
-                </div>
-                <div>
-                  <Label htmlFor="max-tokens">Max Tokens</Label>
-                  <Input id="max-tokens" value={maxTokens} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxTokens(e.target.value)} placeholder="800" type="number" min="1" max="128000" />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="reasoning-effort">Reasoning Effort</Label>
-                <select
-                  id="reasoning-effort"
-                  value={reasoningEffort}
-                  onChange={(e) => setReasoningEffort(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="">Off</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-                <p className="text-xs text-muted-foreground mt-1">Relevant for o1/o3 reasoning models. Leave off for most models.</p>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={saving} className="flex-1">
-                  <Save className="h-4 w-4 mr-2" />{saving ? 'Saving...' : 'Save Configuration'}
-                </Button>
-                <Button variant="outline" onClick={handleTestConnection} disabled={testing}>
-                  <Plug className="h-4 w-4 mr-2" />{testing ? 'Testing...' : 'Test Connection'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {section === 'appearance' && (

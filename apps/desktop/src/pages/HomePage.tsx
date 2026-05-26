@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Settings, Trash2 } from 'lucide-react'
-import { Button, Card, CardHeader, CardTitle, ScrollArea, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@neo-tavern/ui'
+import { Button, Card, CardHeader, CardTitle, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@neo-tavern/ui'
 import { useCharacterStore } from '@/features/character/character.store'
 import { useChatStore } from '@/features/chat/chat.store'
 import type { Character, Chat } from '@neo-tavern/shared'
+import { CharacterAvatarTile } from '@/components'
 
 type HomeContextMenu =
   | { type: 'character'; x: number; y: number; character: Character }
@@ -74,59 +75,43 @@ export function HomePage() {
   }
 
   return (
-    <div className="flex h-full">
-      <div className="w-64 border-r p-4 flex flex-col gap-4 overflow-hidden">
-        <div className="flex items-center justify-between shrink-0">
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="shrink-0 border-b px-6 py-5">
+        <div className="flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold">NeoTavern Demo</h1>
+          <Button variant="outline" onClick={() => navigate('/settings')}>
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </Button>
+        </div>
+
+        <div className="mt-5 flex items-center justify-between gap-4">
           <h2 className="text-lg font-semibold">Characters</h2>
           <Button size="icon" variant="ghost" onClick={() => navigate('/character')}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="flex-1">
-          <div className="flex flex-col gap-1">
+
+        <div className="mt-3 min-h-[128px] overflow-x-auto pb-2">
+          <div className="flex min-w-max gap-4">
             {charsLoading && <p className="text-sm text-muted-foreground p-2">Loading...</p>}
             {!charsLoading && characters.length === 0 && (
               <p className="text-sm text-muted-foreground p-2">No characters yet.</p>
             )}
             {characters.map((char) => (
-              <button
+              <CharacterAvatarTile
                 key={char.id}
+                character={char}
                 onClick={() => handleCharacterClick(char.id)}
                 onContextMenu={(event) => openCharacterContextMenu(event, char)}
-                className="flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-accent"
-              >
-                {char.avatar ? (
-                  <img
-                    src={char.avatar}
-                    alt={char.name}
-                    className="h-10 w-10 shrink-0 rounded-lg border border-border/30 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border/30 bg-accent/60">
-                    <span className="text-sm font-bold text-muted-foreground">{char.name.charAt(0)}</span>
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{char.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{char.description}</p>
-                </div>
-              </button>
+              />
             ))}
           </div>
-        </ScrollArea>
-      </div>
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6 pb-3 shrink-0">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">NeoTavern Demo</h1>
-            <Button variant="outline" onClick={() => navigate('/settings')}>
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-          </div>
-          <h2 className="text-lg font-semibold mb-3">Recent Chats</h2>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        <h2 className="text-lg font-semibold mb-3">Recent Chats</h2>
           {chatsLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
           {!chatsLoading && chats.length === 0 && (
             <p className="text-sm text-muted-foreground">No chats yet. Select a character to start.</p>
@@ -174,7 +159,6 @@ export function HomePage() {
               )
             })}
           </div>
-        </div>
       </div>
 
       {contextMenu && (

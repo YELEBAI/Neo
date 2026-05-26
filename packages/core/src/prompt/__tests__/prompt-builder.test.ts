@@ -214,7 +214,7 @@ describe('buildChatPrompt', () => {
     expect(result.messages[0].content).toContain(customRules)
   })
 
-  it('should inject preset items by injection order', () => {
+  it('should merge preset items into one message by injection order', () => {
     const result = buildChatPrompt({
       character: mockCharacter,
       recentMessages: [],
@@ -226,14 +226,20 @@ describe('buildChatPrompt', () => {
       ],
     })
 
-    const contents = result.messages.map((m) => m.content)
-    const firstIndex = contents.indexOf('First preset card')
-    const secondIndex = contents.indexOf('Second preset card')
-    const thirdIndex = contents.indexOf('Third preset card')
+    const presetMessages = result.messages.filter((m) => m.content.includes('First preset card'))
+    expect(presetMessages).toHaveLength(1)
+    expect(presetMessages[0].role).toBe('system')
+
+    const content = presetMessages[0].content
+    const firstIndex = content.indexOf('First preset card')
+    const secondIndex = content.indexOf('Second preset card')
+    const thirdIndex = content.indexOf('Third preset card')
 
     expect(firstIndex).toBeGreaterThanOrEqual(0)
     expect(firstIndex).toBeLessThan(secondIndex)
     expect(secondIndex).toBeLessThan(thirdIndex)
+    expect(result.previewText).toContain('## system\nFirst preset card\n\nSecond preset card\n\nThird preset card')
+    expect(result.previewText).not.toContain('## user\nSecond preset card')
   })
 })
 

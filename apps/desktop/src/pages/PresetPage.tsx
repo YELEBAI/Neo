@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Trash2, Edit, ArrowLeft, Upload, Download, CheckCircle2, ArrowUp, ArrowDown, GripVertical } from 'lucide-react'
+import { Plus, Trash2, Edit, ArrowLeft, Upload, Download, CheckCircle2, ArrowUp, ArrowDown, GripVertical, LibraryBig } from 'lucide-react'
 import { Button, Input, Textarea, Label, ScrollArea, Card, CardContent, CardHeader, CardTitle, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@neo-tavern/ui'
 import { usePresetStore } from '@/features/preset/preset.store'
+import { EXTRA_PRESET_ITEM_TEMPLATES } from '@/features/preset/preset.templates'
 import type { Preset, PresetItem } from '@neo-tavern/shared'
 import { getStorageItem } from '@/db/storage'
 
@@ -46,6 +47,7 @@ export function PresetPage() {
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [templateId, setTemplateId] = useState(EXTRA_PRESET_ITEM_TEMPLATES[0]?.id ?? '')
 
   useEffect(() => {
     store.loadPresets()
@@ -314,6 +316,30 @@ export function PresetPage() {
     if (file) setImportFile(file)
   }
 
+  const selectedTemplate = EXTRA_PRESET_ITEM_TEMPLATES.find((template) => template.id === templateId) ?? EXTRA_PRESET_ITEM_TEMPLATES[0]
+
+  const handleAddTemplateItem = async () => {
+    if (!selected || !selectedTemplate) return
+    if (selected.items.some((item) => item.content === selectedTemplate.content)) {
+      toast('info', `"${selectedTemplate.name}" is already in this preset.`)
+      return
+    }
+
+    const nextOrder = Math.max(0, ...selected.items.map((item) => item.injectionOrder)) + 10
+    try {
+      await store.addItem(selected.id, {
+        name: selectedTemplate.name,
+        enabled: true,
+        role: selectedTemplate.role,
+        content: selectedTemplate.content,
+        injectionOrder: nextOrder,
+      })
+      toast('success', `"${selectedTemplate.name}" added`)
+    } catch {
+      toast('error', store.error || 'Failed')
+    }
+  }
+
   const sortedItems = selected
     ? sortPresetItems(selected.items)
         .filter((i) => !i.hidden || secretUnlocked)
@@ -321,16 +347,21 @@ export function PresetPage() {
 
   return (
     <div className="flex h-full">
-      <div className="w-56 border-r p-4 flex flex-col gap-2">
-        <button onClick={() => navigate('/')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2">
-          <ArrowLeft className="h-4 w-4" />Back
-        </button>
+      <div className="w-56 border-r p-4 flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Presets</h2>
-          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCreate}>
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-1">
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setImportOpen(true)} disabled={importing} title="Import preset">
+              <Upload className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={handleCreate} className="justify-start text-xs">
+          <Plus className="h-3.5 w-3.5 mr-1" />New Preset
+        </Button>
         <ScrollArea className="flex-1 -mx-2 px-2">
           <div className="flex flex-col gap-0.5">
             {store.presets.length === 0 && !store.loading && (
@@ -351,11 +382,6 @@ export function PresetPage() {
             ))}
           </div>
         </ScrollArea>
-        <div className="border-t pt-2 flex flex-col gap-1">
-          <Button variant="outline" size="sm" className="w-full justify-start text-xs" onClick={() => setImportOpen(true)}>
-            <Upload className="h-3 w-3 mr-1" />Import
-          </Button>
-        </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -370,13 +396,13 @@ export function PresetPage() {
           </div>
         ) : (
           <>
-            <div className="p-6 pb-3 shrink-0 border-b">
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="flex-1 space-y-2">
+            <div className="shrink-0 border-b px-6 py-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="min-w-0 flex-1 space-y-2">
                   <Input
                     value={editName}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditName(e.target.value)}
-                    className="text-xl font-bold border-0 border-b rounded-none px-0 h-auto text-2xl focus-visible:ring-0"
+                    className="border-0 border-b rounded-none px-0 h-auto text-2xl font-bold focus-visible:ring-0"
                     placeholder="Preset name"
                   />
                   <Textarea
@@ -387,7 +413,7 @@ export function PresetPage() {
                     rows={1}
                   />
                 </div>
-                <div className="flex gap-1 shrink-0">
+                <div className="flex flex-wrap gap-1 shrink-0">
                   <Button size="sm" variant="outline" onClick={handleSaveMeta}>Save</Button>
                   <Button size="sm" variant="outline" onClick={handleExport}>
                     <Download className="h-4 w-4" />
@@ -404,21 +430,53 @@ export function PresetPage() {
                   </Button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{sortedItems.length} cards · {sortedItems.filter((i) => i.enabled).length} enabled</span>
-                <Button size="sm" onClick={openNewItem}>
-                  <Plus className="h-3 w-3 mr-1" />Add Card
-                </Button>
+
+              <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="rounded-md border bg-muted/10 p-3">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                    <div className="min-w-0 flex-1">
+                      <Label htmlFor="extra-preset-entry" className="flex items-center gap-1.5">
+                        <LibraryBig className="h-3.5 w-3.5" />Extra Preset Entry
+                      </Label>
+                      <select
+                        id="extra-preset-entry"
+                        value={templateId}
+                        onChange={(e) => setTemplateId(e.target.value)}
+                        className="mt-1 w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {EXTRA_PRESET_ITEM_TEMPLATES.map((template) => (
+                          <option key={template.id} value={template.id}>{template.name}</option>
+                        ))}
+                      </select>
+                      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{selectedTemplate?.description}</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={handleAddTemplateItem} disabled={!selectedTemplate}>
+                      <Plus className="h-3.5 w-3.5 mr-1" />Add Selected
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="rounded-md border bg-muted/10 p-3">
+                  <div className="flex h-full items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{sortedItems.length} cards</p>
+                      <p className="text-xs text-muted-foreground">{sortedItems.filter((i) => i.enabled).length} enabled · drag to reorder</p>
+                    </div>
+                    <Button size="sm" onClick={openNewItem} className="shrink-0">
+                      <Plus className="h-3.5 w-3.5 mr-1" />Blank Card
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
               {sortedItems.length === 0 ? (
                 <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-                  No cards yet. Click "Add Card" to create one.
+                  No cards yet. Add a template entry or create a blank card.
                 </div>
               ) : (
-                <div className="space-y-2 max-w-3xl">
+                <div className="space-y-2 max-w-5xl">
                   {sortedItems.map((item, index) => (
                     <Card
                       key={item.id}

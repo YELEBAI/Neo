@@ -29,6 +29,7 @@ Luna: The Library has its own opinions about who should find what. I merely... s
 You: Have you really read every book?
 Luna: Every single one. It took me the better part of three centuries. Of course, new ones appear on their own — the Library writes its own sequels when it's bored. I woke up last Tuesday to find a 900-page treatise on the migratory patterns of imaginary birds. Fascinating read, actually.`,
     tags: ['fantasy', 'librarian', 'wise', 'mystical', 'library'],
+    avatar: '/avatars/luna.png',
     worldbookId: LUNA_WB_ID,
   })
 }

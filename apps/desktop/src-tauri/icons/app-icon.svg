@@ -1,0 +1,62 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="160" y1="92" x2="864" y2="932" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#081A3B"/>
+      <stop offset="0.5" stop-color="#102C63"/>
+      <stop offset="1" stop-color="#050B1F"/>
+    </linearGradient>
+    <radialGradient id="cyanGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(694 244) rotate(128) scale(548)">
+      <stop stop-color="#5CF2FF" stop-opacity="0.34"/>
+      <stop offset="0.42" stop-color="#5CF2FF" stop-opacity="0.11"/>
+      <stop offset="1" stop-color="#5CF2FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="violetGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(286 804) rotate(-35) scale(450)">
+      <stop stop-color="#C17CFF" stop-opacity="0.28"/>
+      <stop offset="0.45" stop-color="#C17CFF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#C17CFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="archFill" x1="332" y1="214" x2="718" y2="832" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#183E78"/>
+      <stop offset="0.58" stop-color="#071A39"/>
+      <stop offset="1" stop-color="#050B1F"/>
+    </linearGradient>
+    <linearGradient id="line" x1="336" y1="210" x2="718" y2="846" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B7FBFF"/>
+      <stop offset="0.48" stop-color="#55DBFF"/>
+      <stop offset="1" stop-color="#A06BFF"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="390" y1="340" x2="632" y2="782" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFE7A3"/>
+      <stop offset="0.55" stop-color="#5CEBFF"/>
+      <stop offset="1" stop-color="#9B73FF"/>
+    </linearGradient>
+    <filter id="softShadow" x="172" y="88" width="680" height="836" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="34" stdDeviation="36" flood-color="#020817" flood-opacity="0.62"/>
+    </filter>
+    <filter id="neon" x="248" y="164" width="528" height="728" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.25 0 0 0 0 0.9 0 0 0 0 1 0 0 0 0.52 0"/>
+      <feBlend in2="SourceGraphic" mode="screen"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#cyanGlow)"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#violetGlow)"/>
+
+  <path d="M176 780C244 835 348 874 512 874C676 874 780 835 848 780V816C848 865 809 904 760 904H264C215 904 176 865 176 816V780Z" fill="#020817" opacity="0.3"/>
+
+  <g filter="url(#softShadow)">
+    <path d="M282 777V448C282 314 386 206 512 206C638 206 742 314 742 448V777C742 812 714 840 679 840H556L512 796L468 840H345C310 840 282 812 282 777Z" fill="url(#archFill)"/>
+    <path d="M318 770V454C318 339 404 246 512 246C620 246 706 339 706 454V770C706 789 691 804 672 804H572L512 744L452 804H352C333 804 318 789 318 770Z" fill="#06142E"/>
+  </g>
+
+  <g filter="url(#neon)">
+    <path d="M318 770V454C318 339 404 246 512 246C620 246 706 339 706 454V770C706 789 691 804 672 804H572L512 744L452 804H352C333 804 318 789 318 770Z" stroke="url(#line)" stroke-width="26" stroke-linejoin="round"/>
+    <path d="M416 662V420C416 407 427 396 440 396C453 396 464 407 464 420V532L586 405C594 397 607 395 617 400C627 405 634 415 634 427V662C634 675 623 686 610 686C597 686 586 675 586 662V494L464 621V662C464 675 453 686 440 686C427 686 416 675 416 662Z" fill="url(#warm)"/>
+  </g>
+
+  <path d="M512 303L528 349L574 365L528 381L512 427L496 381L450 365L496 349L512 303Z" fill="#FFE7A3"/>
+  <path d="M702 298L713 329L744 340L713 351L702 382L691 351L660 340L691 329L702 298Z" fill="#76F0FF" opacity="0.9"/>
+  <path d="M314 650L326 683L359 695L326 707L314 740L302 707L269 695L302 683L314 650Z" fill="#A983FF" opacity="0.85"/>
+</svg>

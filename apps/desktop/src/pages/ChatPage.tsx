@@ -6,6 +6,7 @@ import { useCharacterStore } from '@/features/character/character.store'
 import { useChatStore } from '@/features/chat/chat.store'
 import { useSendMessage } from '@/features/chat/hooks/useSendMessage'
 import { presetRepository } from '@/db/repositories'
+import { getStorageItem, setStorageItem } from '@/db/storage'
 import { buildChatPrompt, formatPreview, applyRegexRules, resolveWorldbookEntries } from '@neo-tavern/core'
 import type { DisplayBlock, SideBlock } from '@neo-tavern/core'
 import { useSettingsStore } from '@/features/settings/settings.store'
@@ -33,6 +34,9 @@ function toast(type: 'success' | 'error' | 'info', message: string) {
 }
 
 const DEEPSEEK_CONTEXT_LIMIT = 1_000_000
+const CHAT_FONT_SIZE_KEY = 'neotavern_chat_font_size'
+const CHAT_FONT_SIZE_MIN = 12
+const CHAT_FONT_SIZE_MAX = 22
 
 const compactTokenFormatter = new Intl.NumberFormat('en', {
   notation: 'compact',
@@ -41,6 +45,11 @@ const compactTokenFormatter = new Intl.NumberFormat('en', {
 
 function formatCompactToken(value: number) {
   return compactTokenFormatter.format(value)
+}
+
+function clampChatFontSize(value: number) {
+  if (!Number.isFinite(value)) return 15
+  return Math.min(CHAT_FONT_SIZE_MAX, Math.max(CHAT_FONT_SIZE_MIN, Math.round(value)))
 }
 
 function parseSafeDetails(content: string): { className: 'neo-summary' | 'neo-thoughts'; open: boolean; summary: string; body: string } | null {
@@ -142,6 +151,12 @@ export function ChatPage() {
   const characterId = searchParams.get('characterId')
   const character = characters.find((c) => c.id === (currentChat?.characterId ?? characterId))
 
+  const handleFontSizeChange = (value: number) => {
+    const next = clampChatFontSize(value)
+    setFontSize(next)
+    void setStorageItem(CHAT_FONT_SIZE_KEY, String(next))
+  }
+
   const { sendMessage, regenerate, abort, sending, error: sendError, clearError: clearSendError } = useSendMessage({
     character,
     chatId: currentChat?.id,
@@ -153,6 +168,15 @@ export function ChatPage() {
   useEffect(() => {
     loadCharacters()
   }, [loadCharacters])
+
+  useEffect(() => {
+    let cancelled = false
+    getStorageItem(CHAT_FONT_SIZE_KEY).then((raw) => {
+      if (cancelled || raw == null) return
+      setFontSize(clampChatFontSize(Number(raw)))
+    })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     presetRepository.getActivePresetId().then(async (activeId) => {
@@ -691,7 +715,8 @@ export function ChatPage() {
                 min="12"
                 max="22"
                 value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value))}
+                onInput={(e) => handleFontSizeChange(Number(e.currentTarget.value))}
+                onChange={(e) => handleFontSizeChange(Number(e.target.value))}
                 className="w-12 h-1 accent-primary cursor-pointer"
                 title={`Font size: ${fontSize}px`}
               />
