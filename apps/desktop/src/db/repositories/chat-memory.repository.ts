@@ -7,6 +7,10 @@ export interface ChatMemory {
   summary: string
   sourceHash: string
   sourceMessageCount: number
+  compressorConfigId?: string | null
+  compressorKey?: string
+  compressionMode?: 'local' | 'model' | 'fallback'
+  memorySummaryMaxChars?: number
   updatedAt: string
 }
 

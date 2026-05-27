@@ -131,9 +131,11 @@ export function SettingsPage() {
   const setContextTokens = useSettingsStore((s) => s.setContextTokens)
   const promptRecentTurns = useSettingsStore((s) => s.promptRecentTurns)
   const memorySummaryMaxChars = useSettingsStore((s) => s.memorySummaryMaxChars)
+  const memoryCompressorConfigId = useSettingsStore((s) => s.memoryCompressorConfigId)
   const loadMemorySettings = useSettingsStore((s) => s.loadMemorySettings)
   const setPromptRecentTurns = useSettingsStore((s) => s.setPromptRecentTurns)
   const setMemorySummaryMaxChars = useSettingsStore((s) => s.setMemorySummaryMaxChars)
+  const setMemoryCompressorConfigId = useSettingsStore((s) => s.setMemoryCompressorConfigId)
 
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -348,6 +350,9 @@ export function SettingsPage() {
     : baseModelOptions
   const selectedModelMeta = DEEPSEEK_MODEL_OPTIONS.find((option) => option.id === model)
   const isLegacyDeepSeekModel = DEEPSEEK_LEGACY_MODELS.includes(model)
+  const compressorSelectValue = memoryCompressorConfigId && modelConfigs.some((c) => c.id === memoryCompressorConfigId)
+    ? memoryCompressorConfigId
+    : ''
 
   const handleSelectRegexPreset = (id: string) => {
     setSelectedRegexPresetId(id)
@@ -800,6 +805,24 @@ export function SettingsPage() {
                     <p className="text-[10px] text-muted-foreground">Caps the compact memory block built from older messages.</p>
                   </label>
                 </div>
+                <label className="mt-4 block space-y-2">
+                  <span className="text-xs font-medium text-muted-foreground">Compression API</span>
+                  <select
+                    value={compressorSelectValue}
+                    onChange={(e) => setMemoryCompressorConfigId(e.target.value || null)}
+                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  >
+                    <option value="">Local fast compression</option>
+                    {modelConfigs.map((cfg) => (
+                      <option key={cfg.id} value={cfg.id}>
+                        {cfg.name || cfg.model} · {cfg.model}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-muted-foreground">
+                    Selected profiles summarize older turns before chat generation; if the API fails, local compression is used.
+                  </p>
+                </label>
               </div>
             </CardContent>
           </Card>

@@ -22,6 +22,7 @@ interface SettingsState {
   contextTokens: number
   promptRecentTurns: number
   memorySummaryMaxChars: number
+  memoryCompressorConfigId: string | null
   personaName: string
   personaDesc: string
 
@@ -46,6 +47,7 @@ interface SettingsState {
   loadMemorySettings: () => Promise<void>
   setPromptRecentTurns: (turns: number) => void
   setMemorySummaryMaxChars: (chars: number) => void
+  setMemoryCompressorConfigId: (id: string | null) => void
   loadPersona: () => Promise<void>
   savePersona: (name: string, desc: string) => void
   clearError: () => void
@@ -64,6 +66,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   contextTokens: 0,
   promptRecentTurns: DEFAULT_PROMPT_RECENT_TURNS,
   memorySummaryMaxChars: DEFAULT_MEMORY_SUMMARY_MAX_CHARS,
+  memoryCompressorConfigId: null,
   personaName: 'User',
   personaDesc: '',
 
@@ -153,6 +156,10 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         await settingsRepository.setActiveConfigId(null)
         set({ modelConfigs: [], modelConfig: null, activeConfigId: null, loading: false })
       }
+      if (get().memoryCompressorConfigId === id) {
+        await settingsRepository.set('memoryCompressorConfigId', '')
+        set({ memoryCompressorConfigId: null })
+      }
     } catch (err) {
       set({ error: (err as Error).message, loading: false })
       throw err
@@ -220,13 +227,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   loadMemorySettings: async () => {
-    const [recentTurnsRaw, summaryMaxCharsRaw] = await Promise.all([
+    const [recentTurnsRaw, summaryMaxCharsRaw, compressorConfigIdRaw] = await Promise.all([
       settingsRepository.get('promptRecentTurns'),
       settingsRepository.get('memorySummaryMaxChars'),
+      settingsRepository.get('memoryCompressorConfigId'),
     ])
     set({
       promptRecentTurns: recentTurnsRaw ? Math.max(1, parseInt(recentTurnsRaw) || DEFAULT_PROMPT_RECENT_TURNS) : DEFAULT_PROMPT_RECENT_TURNS,
       memorySummaryMaxChars: summaryMaxCharsRaw ? Math.max(1000, parseInt(summaryMaxCharsRaw) || DEFAULT_MEMORY_SUMMARY_MAX_CHARS) : DEFAULT_MEMORY_SUMMARY_MAX_CHARS,
+      memoryCompressorConfigId: compressorConfigIdRaw?.trim() || null,
     })
   },
 
@@ -354,6 +363,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const next = Math.max(1000, Math.round(chars))
     void settingsRepository.set('memorySummaryMaxChars', String(next))
     set({ memorySummaryMaxChars: next })
+  },
+
+  setMemoryCompressorConfigId: (id: string | null) => {
+    const next = id?.trim() || null
+    void settingsRepository.set('memoryCompressorConfigId', next ?? '')
+    set({ memoryCompressorConfigId: next })
   },
 
   loadPersona: async () => {

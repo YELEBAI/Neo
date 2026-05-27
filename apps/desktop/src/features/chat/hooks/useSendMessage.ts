@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useChatStore } from '../chat.store'
 import { useSettingsStore } from '@/features/settings/settings.store'
-import { chatMemoryRepository, presetRepository } from '@/db/repositories'
+import { chatMemoryRepository, presetRepository, settingsRepository } from '@/db/repositories'
 import { buildLightweightMemorySummary, createMemoryContextBlock, hashMessages, splitMessagesByRecentTurns } from '../memory'
 import { buildChatPrompt, createModelProvider, stripPromptContent, WorldbookContributor } from '@neo-tavern/core'
-import type { Character, BuiltPrompt, ContextBlock, Message } from '@neo-tavern/shared'
+import type { Character, BuiltPrompt, ContextBlock, Message, ModelConfig } from '@neo-tavern/shared'
 import type { GenerationPhase } from '../chat.types'
 import { useWorldbookStore } from '@/features/settings/worldbook.store'
 
@@ -32,6 +32,94 @@ interface UseSendMessageReturn {
 
 let activeAbortController: AbortController | null = null
 let activeGenerationId: string | null = null
+
+const LOCAL_MEMORY_COMPRESSOR_KEY = 'local'
+
+function capText(content: string, maxChars: number) {
+  const normalized = content.replace(/\r\n/g, '\n').trim()
+  if (normalized.length <= maxChars) return normalized
+  return `${normalized.slice(0, Math.max(0, maxChars - 1)).trimEnd()}…`
+}
+
+function formatMessagesForCompression(messages: Message[], maxChars: number) {
+  const sourceLimit = Math.max(60_000, Math.min(240_000, maxChars * 20))
+  const source = messages.map((message, index) => {
+    const role = message.role === 'user'
+      ? '用户'
+      : message.role === 'assistant'
+        ? '角色'
+        : '系统'
+    return `### ${index + 1}. ${role}\n${capText(message.content, 4000)}`
+  }).join('\n\n')
+
+  if (source.length <= sourceLimit) return source
+  return `（来源过长，已优先保留靠后的旧剧情片段。）\n${source.slice(source.length - sourceLimit).trimStart()}`
+}
+
+function getMemoryCompressorKey(config: ModelConfig | null) {
+  if (!config) return LOCAL_MEMORY_COMPRESSOR_KEY
+  return [
+    'model',
+    config.id,
+    config.baseUrl,
+    config.model,
+    config.maxTokens,
+    config.updatedAt,
+  ].join(':')
+}
+
+async function resolveMemoryCompressorConfig(configId: string | null) {
+  if (!configId) return null
+  const stateConfig = useSettingsStore.getState().modelConfigs.find((config) => config.id === configId)
+  return stateConfig ?? settingsRepository.getModelConfig(configId)
+}
+
+async function buildModelMemorySummary(
+  messages: Message[],
+  maxChars: number,
+  compressorConfig: ModelConfig,
+  signal?: AbortSignal
+) {
+  const provider = createModelProvider(compressorConfig)
+  const source = formatMessagesForCompression(messages, maxChars)
+  const result = await provider.generate({
+    messages: [
+      {
+        role: 'system',
+        content: [
+          '你是 NeoTavern 的剧情记忆压缩器。',
+          '你的任务是把较早对话压缩成稳定记忆，用于后续角色扮演保持连续性。',
+          '只记录已经发生或已经明确设定的事实，不续写剧情，不新增设定，不评价内容。',
+          '优先保留：角色关系、地点、物品、承诺、目标、伤势/状态、未解决事件、用户角色已经做过的事。',
+        ].join('\n'),
+      },
+      {
+        role: 'user',
+        content: [
+          `请把以下较早对话压缩到 ${maxChars} 字符以内。`,
+          '使用简洁中文分点；最近完整对话会单独提供，所以这里只需要旧剧情记忆。',
+          '不要输出解释，不要说“好的”，直接输出摘要。',
+          '',
+          source,
+        ].join('\n'),
+      },
+    ],
+    model: compressorConfig.model,
+    temperature: Math.min(compressorConfig.temperature ?? 0.2, 0.3),
+    maxTokens: Math.min(
+      Math.max(800, Math.ceil(maxChars / 1.6)),
+      Math.max(800, compressorConfig.maxTokens || 4096),
+      8192
+    ),
+    reasoningEffort: compressorConfig.reasoningEffort || undefined,
+    signal,
+  })
+
+  const summary = result.content.trim()
+  if (!summary) throw new Error('Compression API returned an empty summary.')
+  const header = '以下是较早剧情的智能记忆摘要，用于保持连续性；最近完整对话仍以后续消息为准。'
+  return capText(summary.startsWith(header) ? summary : `${header}\n${summary}`, maxChars)
+}
 
 export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMessageOptions): UseSendMessageReturn {
   const [error, setError] = useState<string | null>(null)
@@ -103,25 +191,54 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
     })
   }
 
-  const getMemoryPromptPlan = async (historyMessages: Message[]): Promise<{ recentMessages: Message[]; memoryBlock: ContextBlock | null }> => {
+  const getMemoryPromptPlan = async (historyMessages: Message[], signal?: AbortSignal): Promise<{ recentMessages: Message[]; memoryBlock: ContextBlock | null }> => {
     const settings = useSettingsStore.getState()
     const { memoryMessages, recentMessages } = splitMessagesByRecentTurns(historyMessages, settings.promptRecentTurns)
     if (memoryMessages.length === 0) {
       return { recentMessages, memoryBlock: null }
     }
 
-    const sourceHash = hashMessages(memoryMessages)
+    const memorySourceMessages = stripMessages(memoryMessages) as Message[]
+    const sourceHash = hashMessages(memorySourceMessages)
+    const compressorConfig = await resolveMemoryCompressorConfig(settings.memoryCompressorConfigId)
+    const compressorKey = getMemoryCompressorKey(compressorConfig)
     const cached = chatId ? await chatMemoryRepository.get(chatId) : null
-    const summary = cached?.sourceHash === sourceHash
-      ? cached.summary
-      : buildLightweightMemorySummary(memoryMessages, settings.memorySummaryMaxChars)
+    const cacheHit = !!cached
+      && cached.sourceHash === sourceHash
+      && cached.compressorKey === compressorKey
+      && cached.memorySummaryMaxChars === settings.memorySummaryMaxChars
 
-    if (chatId && cached?.sourceHash !== sourceHash) {
+    let compressionMode: 'local' | 'model' | 'fallback' = compressorConfig ? 'fallback' : 'local'
+    let summary = cacheHit
+      ? cached!.summary
+      : ''
+
+    if (!cacheHit) {
+      if (compressorConfig) {
+        try {
+          summary = await buildModelMemorySummary(memorySourceMessages, settings.memorySummaryMaxChars, compressorConfig, signal)
+          compressionMode = 'model'
+        } catch (err) {
+          if ((err as Error).name === 'AbortError') throw err
+          summary = buildLightweightMemorySummary(memorySourceMessages, settings.memorySummaryMaxChars)
+          compressionMode = 'fallback'
+        }
+      } else {
+        summary = buildLightweightMemorySummary(memorySourceMessages, settings.memorySummaryMaxChars)
+        compressionMode = 'local'
+      }
+    }
+
+    if (chatId && !cacheHit) {
       await chatMemoryRepository.upsert({
         chatId,
         summary,
         sourceHash,
-        sourceMessageCount: memoryMessages.length,
+        sourceMessageCount: memorySourceMessages.length,
+        compressorConfigId: compressorConfig?.id ?? null,
+        compressorKey,
+        compressionMode,
+        memorySummaryMaxChars: settings.memorySummaryMaxChars,
       })
     }
 
@@ -166,7 +283,7 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
       }
 
       const historyMessages = options.hiddenUserMessage ? recentMessages : recentMessages.slice(0, -1)
-      const memoryPlan = await getMemoryPromptPlan(historyMessages)
+      const memoryPlan = await getMemoryPromptPlan(historyMessages, controller.signal)
       const worldbookBlocks = await getWorldbookContextBlocks(trimmedContent, recentMessages)
       const contextBlocks = [
         memoryPlan.memoryBlock,
@@ -329,7 +446,7 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
       }
 
       const historyMessages = afterDelete.slice(0, -1)
-      const memoryPlan = await getMemoryPromptPlan(historyMessages)
+      const memoryPlan = await getMemoryPromptPlan(historyMessages, controller.signal)
       const worldbookBlocks = await getWorldbookContextBlocks(userContent, afterDelete)
       const contextBlocks = [
         memoryPlan.memoryBlock,
