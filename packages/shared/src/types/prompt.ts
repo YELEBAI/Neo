@@ -8,6 +8,9 @@ export interface ContextBlock {
   title: string
   content: string
   priority: number
+  role?: GenerateMessage['role']
+  position?: 'beforeHistory' | 'afterHistory' | 'atDepth'
+  depth?: number
 }
 
 export interface ContextInput {

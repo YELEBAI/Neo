@@ -34,6 +34,23 @@ export function trimMessagesByTokens(messages: { role: string; content: string }
   return kept
 }
 
+function contextBlockToMessage(block: ContextBlock, safeReplace: (value: string) => string): GenerateMessage {
+  return {
+    role: block.role ?? 'system',
+    content: safeReplace(`[${block.source}] ${block.title}\n${block.content}`),
+  }
+}
+
+function insertDepthBlocks(history: GenerateMessage[], blocks: ContextBlock[], safeReplace: (value: string) => string) {
+  const next = [...history]
+  for (const block of blocks) {
+    const depth = Math.max(0, Math.floor(block.depth ?? 0))
+    const index = Math.max(0, next.length - depth)
+    next.splice(index, 0, contextBlockToMessage(block, safeReplace))
+  }
+  return next
+}
+
 export function buildChatPrompt(input: BuildPromptInput): BuiltPrompt {
   const messages: GenerateMessage[] = []
   const uname = input.userName || 'User'
@@ -68,8 +85,11 @@ export function buildChatPrompt(input: BuildPromptInput): BuiltPrompt {
     : null
 
   const sortedContextBlocks = [...(input.contextBlocks ?? [])].sort(
-    (a, b) => b.priority - a.priority
+    (a, b) => b.priority - a.priority || a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
   )
+  const beforeHistoryBlocks = sortedContextBlocks.filter((block) => (block.position ?? 'beforeHistory') === 'beforeHistory')
+  const atDepthBlocks = sortedContextBlocks.filter((block) => block.position === 'atDepth')
+  const afterHistoryBlocks = sortedContextBlocks.filter((block) => block.position === 'afterHistory')
 
   if (!hasSystemPreset) {
     messages.push({
@@ -86,8 +106,18 @@ export function buildChatPrompt(input: BuildPromptInput): BuiltPrompt {
     messages.push({ role: 'system', content: safeReplace(`User Persona:\n${input.userPersona}`) })
   }
 
+  for (const block of beforeHistoryBlocks) {
+    messages.push(contextBlockToMessage(block, safeReplace))
+  }
+
   const userInputMsg: GenerateMessage = { role: 'user', content: input.userInput }
 
+  const contextTokenOverhead = sortedContextBlocks.reduce((sum, block) => sum + estTokens(block.title) + estTokens(block.content), 0)
+  const firstMessage = input.character.firstMessage && input.recentMessages.length === 0
+    ? { role: 'assistant' as const, content: safeReplace(input.character.firstMessage) }
+    : null
+
+  let historyMessages: GenerateMessage[] = []
   const maxTokens = input.maxTotalTokens && input.maxTotalTokens > 0 ? input.maxTotalTokens : 0
   if (maxTokens > 0) {
     let overhead = estTokens(DIALOGUE_FORMAT_RULES)
@@ -96,27 +126,27 @@ export function buildChatPrompt(input: BuildPromptInput): BuiltPrompt {
     overhead += estTokens(characterBlock)
     if (input.userPersona) overhead += estTokens(safeReplace(`User Persona:\n${input.userPersona}`))
     overhead += estTokens(input.userInput)
+    overhead += contextTokenOverhead
+    if (firstMessage) overhead += estTokens(firstMessage.content)
 
     const historyBudget = maxTokens - overhead - 100
     const trimmed = historyBudget > 0
       ? trimMessagesByTokens(input.recentMessages, historyBudget)
       : input.recentMessages.slice(-2)
 
-    for (const message of trimmed) {
-      messages.push({ role: message.role as 'user' | 'assistant' | 'system', content: message.content })
-    }
+    historyMessages = trimmed.map((message) => ({ role: message.role as 'user' | 'assistant' | 'system', content: message.content }))
   } else {
-    for (const message of input.recentMessages) {
-      messages.push({ role: message.role as 'user' | 'assistant' | 'system', content: message.content })
-    }
+    historyMessages = input.recentMessages.map((message) => ({ role: message.role as 'user' | 'assistant' | 'system', content: message.content }))
   }
 
-  if (input.character.firstMessage && input.recentMessages.length === 0) {
-    messages.push({ role: 'assistant', content: safeReplace(input.character.firstMessage) })
+  if (firstMessage) historyMessages.push(firstMessage)
+
+  for (const message of insertDepthBlocks(historyMessages, atDepthBlocks, safeReplace)) {
+    messages.push(message)
   }
 
-  for (const block of sortedContextBlocks) {
-    messages.push({ role: 'system', content: safeReplace(`[${block.source}] ${block.title}\n${block.content}`) })
+  for (const block of afterHistoryBlocks) {
+    messages.push(contextBlockToMessage(block, safeReplace))
   }
 
   messages.push(userInputMsg)

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { settingsRepository } from '@/db/repositories'
+import { DEFAULT_MEMORY_SUMMARY_MAX_CHARS, DEFAULT_PROMPT_RECENT_TURNS } from '@/features/chat/memory'
 import { generateId } from '@neo-tavern/shared'
 import type { ModelConfig, CreateModelConfigInput, UpdateModelConfigInput, RegexPreset, RegexRule, CreateRegexPresetInput, UpdateRegexPresetInput, CreateRegexRuleInput, UpdateRegexRuleInput } from '@neo-tavern/shared'
 
@@ -19,6 +20,8 @@ interface SettingsState {
   regexPresets: RegexPreset[]
   activeRegexPresetId: string | null
   contextTokens: number
+  promptRecentTurns: number
+  memorySummaryMaxChars: number
   personaName: string
   personaDesc: string
 
@@ -40,6 +43,9 @@ interface SettingsState {
   toggleRegexRule: (presetId: string, ruleId: string) => Promise<void>
   getActiveRegexRules: () => RegexRule[]
   setContextTokens: (tokens: number) => void
+  loadMemorySettings: () => Promise<void>
+  setPromptRecentTurns: (turns: number) => void
+  setMemorySummaryMaxChars: (chars: number) => void
   loadPersona: () => Promise<void>
   savePersona: (name: string, desc: string) => void
   clearError: () => void
@@ -56,6 +62,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   regexPresets: [],
   activeRegexPresetId: null,
   contextTokens: 0,
+  promptRecentTurns: DEFAULT_PROMPT_RECENT_TURNS,
+  memorySummaryMaxChars: DEFAULT_MEMORY_SUMMARY_MAX_CHARS,
   personaName: 'User',
   personaDesc: '',
 
@@ -211,6 +219,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (raw !== null && raw !== undefined) set({ contextTokens: parseInt(raw) || 0 })
   },
 
+  loadMemorySettings: async () => {
+    const [recentTurnsRaw, summaryMaxCharsRaw] = await Promise.all([
+      settingsRepository.get('promptRecentTurns'),
+      settingsRepository.get('memorySummaryMaxChars'),
+    ])
+    set({
+      promptRecentTurns: recentTurnsRaw ? Math.max(1, parseInt(recentTurnsRaw) || DEFAULT_PROMPT_RECENT_TURNS) : DEFAULT_PROMPT_RECENT_TURNS,
+      memorySummaryMaxChars: summaryMaxCharsRaw ? Math.max(1000, parseInt(summaryMaxCharsRaw) || DEFAULT_MEMORY_SUMMARY_MAX_CHARS) : DEFAULT_MEMORY_SUMMARY_MAX_CHARS,
+    })
+  },
+
   createRegexPreset: async (input) => {
     set({ loading: true, error: null })
     try {
@@ -323,6 +342,18 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setContextTokens: (tokens: number) => {
     void settingsRepository.set('contextTokens', String(tokens))
     set({ contextTokens: tokens })
+  },
+
+  setPromptRecentTurns: (turns: number) => {
+    const next = Math.max(1, Math.round(turns))
+    void settingsRepository.set('promptRecentTurns', String(next))
+    set({ promptRecentTurns: next })
+  },
+
+  setMemorySummaryMaxChars: (chars: number) => {
+    const next = Math.max(1000, Math.round(chars))
+    void settingsRepository.set('memorySummaryMaxChars', String(next))
+    set({ memorySummaryMaxChars: next })
   },
 
   loadPersona: async () => {

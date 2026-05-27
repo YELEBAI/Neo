@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { useChatStore } from '../chat.store'
 import { useSettingsStore } from '@/features/settings/settings.store'
-import { presetRepository } from '@/db/repositories'
+import { chatMemoryRepository, presetRepository } from '@/db/repositories'
+import { buildLightweightMemorySummary, createMemoryContextBlock, hashMessages, splitMessagesByRecentTurns } from '../memory'
 import { buildChatPrompt, createModelProvider, stripPromptContent, WorldbookContributor } from '@neo-tavern/core'
-import type { Character, BuiltPrompt, Message } from '@neo-tavern/shared'
+import type { Character, BuiltPrompt, ContextBlock, Message } from '@neo-tavern/shared'
 import type { GenerationPhase } from '../chat.types'
 import { useWorldbookStore } from '@/features/settings/worldbook.store'
 
@@ -102,6 +103,34 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
     })
   }
 
+  const getMemoryPromptPlan = async (historyMessages: Message[]): Promise<{ recentMessages: Message[]; memoryBlock: ContextBlock | null }> => {
+    const settings = useSettingsStore.getState()
+    const { memoryMessages, recentMessages } = splitMessagesByRecentTurns(historyMessages, settings.promptRecentTurns)
+    if (memoryMessages.length === 0) {
+      return { recentMessages, memoryBlock: null }
+    }
+
+    const sourceHash = hashMessages(memoryMessages)
+    const cached = chatId ? await chatMemoryRepository.get(chatId) : null
+    const summary = cached?.sourceHash === sourceHash
+      ? cached.summary
+      : buildLightweightMemorySummary(memoryMessages, settings.memorySummaryMaxChars)
+
+    if (chatId && cached?.sourceHash !== sourceHash) {
+      await chatMemoryRepository.upsert({
+        chatId,
+        summary,
+        sourceHash,
+        sourceMessageCount: memoryMessages.length,
+      })
+    }
+
+    return {
+      recentMessages,
+      memoryBlock: createMemoryContextBlock(summary),
+    }
+  }
+
   const sendMessage = useCallback(async (content: string, options: SendMessageOptions = {}) => {
     const trimmedContent = content.trim()
     if (!trimmedContent || !chatId || !character) return
@@ -137,14 +166,20 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
       }
 
       const historyMessages = options.hiddenUserMessage ? recentMessages : recentMessages.slice(0, -1)
+      const memoryPlan = await getMemoryPromptPlan(historyMessages)
+      const worldbookBlocks = await getWorldbookContextBlocks(trimmedContent, recentMessages)
+      const contextBlocks = [
+        memoryPlan.memoryBlock,
+        ...worldbookBlocks,
+      ].filter(Boolean) as ContextBlock[]
 
       const built = buildChatPrompt({
         character,
-        recentMessages: stripMessages(historyMessages) as Message[],
+        recentMessages: stripMessages(memoryPlan.recentMessages) as Message[],
         userInput: trimmedContent,
         maxTotalTokens: contextTokens,
         presetItems,
-        contextBlocks: await getWorldbookContextBlocks(trimmedContent, recentMessages),
+        contextBlocks,
         userName: useSettingsStore.getState().personaName,
       })
 
@@ -294,14 +329,20 @@ export function useSendMessage({ character, chatId, onPromptBuilt }: UseSendMess
       }
 
       const historyMessages = afterDelete.slice(0, -1)
+      const memoryPlan = await getMemoryPromptPlan(historyMessages)
+      const worldbookBlocks = await getWorldbookContextBlocks(userContent, afterDelete)
+      const contextBlocks = [
+        memoryPlan.memoryBlock,
+        ...worldbookBlocks,
+      ].filter(Boolean) as ContextBlock[]
 
       const built = buildChatPrompt({
         character,
-        recentMessages: stripMessages(historyMessages) as Message[],
+        recentMessages: stripMessages(memoryPlan.recentMessages) as Message[],
         userInput: userContent,
         maxTotalTokens: contextTokens,
         presetItems,
-        contextBlocks: await getWorldbookContextBlocks(userContent, afterDelete),
+        contextBlocks,
         userName: useSettingsStore.getState().personaName,
       })
 

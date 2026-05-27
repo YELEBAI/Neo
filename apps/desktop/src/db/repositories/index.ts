@@ -1,5 +1,6 @@
 export { characterRepository } from './character.repository'
 export { chatRepository } from './chat.repository'
+export { chatMemoryRepository, type ChatMemory } from './chat-memory.repository'
 export { messageRepository } from './message.repository'
 export { settingsRepository } from './settings.repository'
 export { presetRepository } from './preset.repository'

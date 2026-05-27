@@ -114,10 +114,20 @@ export function WorldbookPage() {
 
   const [entryTitle, setEntryTitle] = useState('')
   const [entryKeys, setEntryKeys] = useState('')
+  const [entrySecondaryKeys, setEntrySecondaryKeys] = useState('')
   const [entryContent, setEntryContent] = useState('')
   const [entryPriority, setEntryPriority] = useState('100')
   const [entryType, setEntryType] = useState<'always' | 'trigger'>('trigger')
   const [entryTriggerMode, setEntryTriggerMode] = useState<'and' | 'or'>('or')
+  const [entrySelectiveLogic, setEntrySelectiveLogic] = useState<'and' | 'or'>('or')
+  const [entryScanDepth, setEntryScanDepth] = useState('8')
+  const [entryCaseSensitive, setEntryCaseSensitive] = useState(false)
+  const [entryMatchWholeWords, setEntryMatchWholeWords] = useState(false)
+  const [entryUseProbability, setEntryUseProbability] = useState(false)
+  const [entryProbability, setEntryProbability] = useState('100')
+  const [entryPosition, setEntryPosition] = useState<'beforeHistory' | 'afterHistory' | 'atDepth'>('beforeHistory')
+  const [entryDepth, setEntryDepth] = useState('0')
+  const [entryRole, setEntryRole] = useState<'system' | 'user' | 'assistant'>('system')
   const [entryEnabled, setEntryEnabled] = useState(true)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
   const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(() => new Set())
@@ -152,10 +162,20 @@ export function WorldbookPage() {
     setEditingEntryId(null)
     setEntryTitle('')
     setEntryKeys('')
+    setEntrySecondaryKeys('')
     setEntryContent('')
     setEntryPriority('100')
     setEntryType('trigger')
     setEntryTriggerMode('or')
+    setEntrySelectiveLogic('or')
+    setEntryScanDepth('8')
+    setEntryCaseSensitive(false)
+    setEntryMatchWholeWords(false)
+    setEntryUseProbability(false)
+    setEntryProbability('100')
+    setEntryPosition('beforeHistory')
+    setEntryDepth('0')
+    setEntryRole('system')
     setEntryEnabled(true)
   }
 
@@ -221,10 +241,20 @@ export function WorldbookPage() {
     setEditingEntryId(entry.id)
     setEntryTitle(entry.title)
     setEntryKeys(entry.keys)
+    setEntrySecondaryKeys(entry.secondaryKeys ?? '')
     setEntryContent(entry.content)
     setEntryPriority(String(entry.priority))
     setEntryType(entry.type)
     setEntryTriggerMode(entry.triggerMode)
+    setEntrySelectiveLogic(entry.selectiveLogic ?? 'or')
+    setEntryScanDepth(String(entry.scanDepth ?? 8))
+    setEntryCaseSensitive(entry.caseSensitive ?? false)
+    setEntryMatchWholeWords(entry.matchWholeWords ?? false)
+    setEntryUseProbability(entry.useProbability ?? false)
+    setEntryProbability(String(entry.probability ?? 100))
+    setEntryPosition(entry.position ?? 'beforeHistory')
+    setEntryDepth(String(entry.depth ?? 0))
+    setEntryRole(entry.role ?? 'system')
     setEntryEnabled(entry.enabled)
   }
 
@@ -242,13 +272,26 @@ export function WorldbookPage() {
     }
 
     const parsedPriority = Number.parseInt(entryPriority, 10)
+    const parsedScanDepth = Number.parseInt(entryScanDepth, 10)
+    const parsedProbability = Number.parseInt(entryProbability, 10)
+    const parsedDepth = Number.parseInt(entryDepth, 10)
     const data = {
       title: entryTitle.trim(),
       keys: entryKeys,
+      secondaryKeys: entrySecondaryKeys,
       content: entryContent,
       priority: Number.isFinite(parsedPriority) ? parsedPriority : 100,
       type: entryType,
       triggerMode: entryTriggerMode,
+      selectiveLogic: entrySelectiveLogic,
+      scanDepth: Number.isFinite(parsedScanDepth) ? Math.max(0, parsedScanDepth) : 8,
+      caseSensitive: entryCaseSensitive,
+      matchWholeWords: entryMatchWholeWords,
+      useProbability: entryUseProbability,
+      probability: Number.isFinite(parsedProbability) ? Math.min(100, Math.max(0, parsedProbability)) : 100,
+      position: entryPosition,
+      depth: Number.isFinite(parsedDepth) ? Math.max(0, parsedDepth) : 0,
+      role: entryRole,
       enabled: entryEnabled,
     }
 
@@ -498,6 +541,18 @@ export function WorldbookPage() {
                                 )}
                               </div>
 
+                              <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
+                                <span className="rounded-full border px-2 py-0.5">scan {entry.scanDepth ?? 8}</span>
+                                <span className="rounded-full border px-2 py-0.5">{entry.position ?? 'beforeHistory'}</span>
+                                <span className="rounded-full border px-2 py-0.5">{entry.role ?? 'system'}</span>
+                                {(entry.secondaryKeys ?? '').trim() && (
+                                  <span className="rounded-full border px-2 py-0.5">secondary {entry.selectiveLogic ?? 'or'}</span>
+                                )}
+                                {entry.matchWholeWords && <span className="rounded-full border px-2 py-0.5">whole word</span>}
+                                {entry.caseSensitive && <span className="rounded-full border px-2 py-0.5">case</span>}
+                                {entry.useProbability && <span className="rounded-full border px-2 py-0.5">{entry.probability ?? 100}%</span>}
+                              </div>
+
                               <div
                                 className={`relative rounded-md border bg-background/60 px-3 py-2 text-xs leading-6 text-muted-foreground ${
                                   isLong ? (isExpanded ? 'max-h-80 overflow-y-auto' : 'max-h-36 overflow-hidden') : ''
@@ -628,6 +683,108 @@ export function WorldbookPage() {
                         placeholder="Comma-separated keywords"
                       />
                     </label>
+
+                    <label className="block space-y-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">Secondary keys</span>
+                      <Input
+                        value={entrySecondaryKeys}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => setEntrySecondaryKeys(event.target.value)}
+                        placeholder="Optional Tavern selective keys"
+                      />
+                    </label>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Scan depth</span>
+                        <Input
+                          value={entryScanDepth}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => setEntryScanDepth(event.target.value)}
+                          type="number"
+                          min="0"
+                          placeholder="8"
+                        />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Probability</span>
+                        <Input
+                          value={entryProbability}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => setEntryProbability(event.target.value)}
+                          type="number"
+                          min="0"
+                          max="100"
+                          disabled={!entryUseProbability}
+                          placeholder="100"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 rounded-md border bg-background/50 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">Case sensitive</span>
+                        <SwitchButton checked={entryCaseSensitive} onClick={() => setEntryCaseSensitive(!entryCaseSensitive)} label="Toggle case sensitive" />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">Whole words</span>
+                        <SwitchButton checked={entryMatchWholeWords} onClick={() => setEntryMatchWholeWords(!entryMatchWholeWords)} label="Toggle whole word matching" />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-muted-foreground">Use probability</span>
+                        <SwitchButton checked={entryUseProbability} onClick={() => setEntryUseProbability(!entryUseProbability)} label="Toggle probability" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <span className="text-xs text-muted-foreground">Secondary logic</span>
+                        <div className="grid grid-cols-2 rounded-md border bg-background p-1">
+                          {(['or', 'and'] as const).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => setEntrySelectiveLogic(mode)}
+                              className={`rounded px-2 py-1 text-xs font-medium ${entrySelectiveLogic === mode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
+                            >
+                              {mode.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Position</span>
+                        <select
+                          value={entryPosition}
+                          onChange={(event: ChangeEvent<HTMLSelectElement>) => setEntryPosition(event.target.value as typeof entryPosition)}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="beforeHistory">Before history</option>
+                          <option value="afterHistory">After history</option>
+                          <option value="atDepth">At depth</option>
+                        </select>
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Depth</span>
+                        <Input
+                          value={entryDepth}
+                          onChange={(event: ChangeEvent<HTMLInputElement>) => setEntryDepth(event.target.value)}
+                          type="number"
+                          min="0"
+                          disabled={entryPosition !== 'atDepth'}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="block space-y-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">Role</span>
+                        <select
+                          value={entryRole}
+                          onChange={(event: ChangeEvent<HTMLSelectElement>) => setEntryRole(event.target.value as typeof entryRole)}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          <option value="system">System</option>
+                          <option value="user">User</option>
+                          <option value="assistant">Assistant</option>
+                        </select>
+                      </label>
+                    </div>
 
                     <label className="block space-y-1.5">
                       <span className="text-xs font-medium text-muted-foreground">Content</span>

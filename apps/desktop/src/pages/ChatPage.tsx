@@ -5,6 +5,7 @@ import { Button, Input, Card, CardContent, Textarea, Dialog, DialogContent, Dial
 import { useCharacterStore } from '@/features/character/character.store'
 import { useChatStore } from '@/features/chat/chat.store'
 import { useSendMessage } from '@/features/chat/hooks/useSendMessage'
+import { buildLightweightMemorySummary, createMemoryContextBlock, splitMessagesByRecentTurns } from '@/features/chat/memory'
 import type { GenerationPhase } from '@/features/chat/chat.types'
 import { chatRepository, chatSavepointRepository, createDefaultSavepointName, messageRepository, presetRepository } from '@/db/repositories'
 import type { ChatSavepoint } from '@/db/repositories'
@@ -13,7 +14,7 @@ import { buildChatPrompt, formatPreview, applyRegexRules, resolveWorldbookEntrie
 import type { DisplayBlock, SideBlock } from '@neo-tavern/core'
 import { useSettingsStore } from '@/features/settings/settings.store'
 import { useWorldbookStore } from '@/features/settings/worldbook.store'
-import type { BuiltPrompt, Message } from '@neo-tavern/shared'
+import type { BuiltPrompt, ContextBlock, Message } from '@neo-tavern/shared'
 
 function Avatar({ name, src, isUser }: { name: string; src?: string; isUser?: boolean }) {
   const initial = name.charAt(0).toUpperCase()
@@ -336,31 +337,41 @@ export function ChatPage() {
 
   const updatePreview = (userInput: string) => {
     if (!character) return
-    const cs = useSettingsStore.getState().contextTokens || 64000
+    const settingsState = useSettingsStore.getState()
+    const cs = settingsState.contextTokens || 64000
+    const memorySplit = splitMessagesByRecentTurns(messages, settingsState.promptRecentTurns)
+    const memorySummary = buildLightweightMemorySummary(memorySplit.memoryMessages, settingsState.memorySummaryMaxChars)
+    const memoryBlock = createMemoryContextBlock(memorySummary)
     const wbState = useWorldbookStore.getState()
-    let contextBlocks: any[] | undefined
+    let contextBlocks: ContextBlock[] | undefined
     if (wbState.activeWorldbookId) {
       const wb = wbState.worldbooks.find((w) => w.id === wbState.activeWorldbookId)
       if (wb && wb.entries.length > 0) {
-        const recentText = messages.map((m) => m.content).join('\n')
-        const { matched } = resolveWorldbookEntries(wb.entries, userInput || '', recentText)
+        const { matched } = resolveWorldbookEntries(wb.entries, userInput || '', messages)
         contextBlocks = matched.map((e) => ({
           id: e.id,
           source: 'worldbook' as const,
           title: e.title,
           content: e.content,
           priority: e.priority,
+          role: e.role ?? 'system',
+          position: e.position ?? 'beforeHistory',
+          depth: e.depth ?? 0,
         }))
       }
     }
+    const allContextBlocks = [
+      memoryBlock,
+      ...(contextBlocks ?? []),
+    ].filter(Boolean)
     const built = buildChatPrompt({
       character,
-      recentMessages: messages,
+      recentMessages: memorySplit.recentMessages,
       userInput: userInput || '(your message)',
       maxTotalTokens: cs,
       presetItems: presetItemsRef.current,
-      contextBlocks,
-      userName: useSettingsStore.getState().personaName,
+      contextBlocks: allContextBlocks as ContextBlock[],
+      userName: settingsState.personaName,
     })
     setPreviewText(formatPreview(built))
   }

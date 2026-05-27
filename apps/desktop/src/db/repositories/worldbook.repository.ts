@@ -83,10 +83,20 @@ export const worldbookRepository = {
       worldbookId,
       title: input.title,
       keys: input.keys,
+      secondaryKeys: input.secondaryKeys ?? '',
       content: input.content,
       priority: input.priority,
       type: input.type,
       triggerMode: input.triggerMode,
+      selectiveLogic: input.selectiveLogic ?? 'or',
+      scanDepth: input.scanDepth ?? 8,
+      caseSensitive: input.caseSensitive ?? false,
+      matchWholeWords: input.matchWholeWords ?? false,
+      useProbability: input.useProbability ?? false,
+      probability: input.probability ?? 100,
+      position: input.position ?? 'beforeHistory',
+      depth: input.depth ?? 0,
+      role: input.role ?? 'system',
       enabled: input.enabled,
       createdAt: now,
       updatedAt: now,
@@ -110,10 +120,20 @@ export const worldbookRepository = {
     const entry = all[wIdx].entries[eIdx]
     if (input.title !== undefined) entry.title = input.title
     if (input.keys !== undefined) entry.keys = input.keys
+    if (input.secondaryKeys !== undefined) entry.secondaryKeys = input.secondaryKeys
     if (input.content !== undefined) entry.content = input.content
     if (input.priority !== undefined) entry.priority = input.priority
     if (input.type !== undefined) entry.type = input.type
     if (input.triggerMode !== undefined) entry.triggerMode = input.triggerMode
+    if (input.selectiveLogic !== undefined) entry.selectiveLogic = input.selectiveLogic
+    if (input.scanDepth !== undefined) entry.scanDepth = input.scanDepth
+    if (input.caseSensitive !== undefined) entry.caseSensitive = input.caseSensitive
+    if (input.matchWholeWords !== undefined) entry.matchWholeWords = input.matchWholeWords
+    if (input.useProbability !== undefined) entry.useProbability = input.useProbability
+    if (input.probability !== undefined) entry.probability = input.probability
+    if (input.position !== undefined) entry.position = input.position
+    if (input.depth !== undefined) entry.depth = input.depth
+    if (input.role !== undefined) entry.role = input.role
     if (input.enabled !== undefined) entry.enabled = input.enabled
     entry.updatedAt = new Date().toISOString()
     all[wIdx].entries[eIdx] = entry

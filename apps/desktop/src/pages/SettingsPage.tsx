@@ -129,6 +129,11 @@ export function SettingsPage() {
   const toggleRegexRule = useSettingsStore((s) => s.toggleRegexRule)
   const contextTokens = useSettingsStore((s) => s.contextTokens)
   const setContextTokens = useSettingsStore((s) => s.setContextTokens)
+  const promptRecentTurns = useSettingsStore((s) => s.promptRecentTurns)
+  const memorySummaryMaxChars = useSettingsStore((s) => s.memorySummaryMaxChars)
+  const loadMemorySettings = useSettingsStore((s) => s.loadMemorySettings)
+  const setPromptRecentTurns = useSettingsStore((s) => s.setPromptRecentTurns)
+  const setMemorySummaryMaxChars = useSettingsStore((s) => s.setMemorySummaryMaxChars)
 
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -197,6 +202,7 @@ export function SettingsPage() {
     }
     load()
     loadRegexRules()
+    loadMemorySettings()
     getStorageItem('neotavern_secret_unlocked').then((value) => {
       if (!cancelled) setSecretUnlocked(value === '1')
     })
@@ -752,6 +758,49 @@ export function SettingsPage() {
               <p className="text-xs text-muted-foreground mt-4">
                 Token estimation uses ~4 chars per token. Actual token count depends on the model&apos;s tokenizer.
               </p>
+
+              <div className="rounded-lg border bg-card/40 p-4">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold">Lightweight Memory</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Older turns are compacted into a stable memory block; only recent turns stay as full chat history.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">Recent full turns</span>
+                      <span className="text-sm font-semibold tabular-nums">{promptRecentTurns}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="4"
+                      max="40"
+                      step="1"
+                      value={promptRecentTurns}
+                      onChange={(e) => setPromptRecentTurns(parseInt(e.target.value))}
+                      className="w-full h-2 rounded-full appearance-none bg-muted-foreground/20 cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Prompt keeps this many latest user turns in full.</p>
+                  </label>
+                  <label className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">Memory max chars</span>
+                      <span className="text-sm font-semibold tabular-nums">{memorySummaryMaxChars}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1000"
+                      max="12000"
+                      step="500"
+                      value={memorySummaryMaxChars}
+                      onChange={(e) => setMemorySummaryMaxChars(parseInt(e.target.value))}
+                      className="w-full h-2 rounded-full appearance-none bg-muted-foreground/20 cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+                    />
+                    <p className="text-[10px] text-muted-foreground">Caps the compact memory block built from older messages.</p>
+                  </label>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}
