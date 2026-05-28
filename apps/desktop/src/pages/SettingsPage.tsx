@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   Save,
   Plug,
   Sun,
@@ -21,10 +20,6 @@ import {
   BookOpen,
   HelpCircle,
 } from "lucide-react";
-
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
-const DEEPSEEK_LEGACY_MODELS = ["deepseek-chat", "deepseek-reasoner"];
 import {
   Button,
   Input,
@@ -43,15 +38,17 @@ import {
   DialogFooter,
 } from "@neo-tavern/ui";
 import { useSettingsStore } from "@/features/settings/settings.store";
-import { useTheme } from "@/app/theme";
 import { getStorageItem, setStorageItem } from "@/db/storage";
 import { useTranslation } from "react-i18next";
-import { getLocale, changeLocale, type Locale } from "@/i18n";
+import { getLocale, type Locale } from "@/i18n";
+import { SettingsSidebar } from "./settings/SettingsSidebar";
+import { AppearanceSection } from "./settings/AppearanceSection";
+import { ContextSection } from "./settings/ContextSection";
+import { toast } from "@/utils/toast";
 
-function toast(type: "success" | "error" | "info", message: string) {
-  const fn = (window as any).__toast;
-  if (fn) fn(type, message);
-}
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-flash";
+const DEEPSEEK_LEGACY_MODELS = ["deepseek-chat", "deepseek-reasoner"];
 
 type Section = "api" | "appearance" | "regex" | "context";
 
@@ -63,44 +60,7 @@ type ThemeOption = {
   label: string;
 };
 
-function fillForm(cfg: {
-  name: string;
-  baseUrl: string;
-  apiKey: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  reasoningEffort?: string;
-  streamingEnabled?: boolean;
-}) {
-  setFormName(cfg.name);
-  setFormBaseUrl(cfg.baseUrl);
-  setFormApiKey(cfg.apiKey);
-  setFormModel(cfg.model);
-  setFormTemperature(String(cfg.temperature));
-  setFormMaxTokens(String(cfg.maxTokens));
-  setFormReasoningEffort(cfg.reasoningEffort || "");
-  setFormStreamingEnabled(cfg.streamingEnabled !== false);
-}
-
-let setFormName: (v: string) => void = () => {};
-let setFormBaseUrl: (v: string) => void = () => {};
-let setFormApiKey: (v: string) => void = () => {};
-let setFormModel: (v: string) => void = () => {};
-let setFormTemperature: (v: string) => void = () => {};
-let setFormMaxTokens: (v: string) => void = () => {};
-let setFormReasoningEffort: (v: string) => void = () => {};
-let setFormStreamingEnabled: (v: boolean) => void = () => {};
-
-function SwitchButton({
-  checked,
-  onClick,
-  label,
-}: {
-  checked: boolean;
-  onClick: () => void;
-  label: string;
-}) {
+function SwitchButton({ checked, onClick, label }: { checked: boolean; onClick: () => void; label: string }) {
   return (
     <button
       type="button"
@@ -123,10 +83,8 @@ function SwitchButton({
 
 export function SettingsPage() {
   const { t } = useTranslation("settings");
-  const { t: tc } = useTranslation("common");
   const [locale, setLocale] = useState<Locale>(getLocale);
   const navigate = useNavigate();
-  const { theme, setTheme, resolvedTheme } = useTheme();
   const [section, setSection] = useState<Section>("api");
 
   const sections: SectionWithLabel[] = [
@@ -152,18 +110,14 @@ export function SettingsPage() {
   const selectConfig = useSettingsStore((s) => s.selectConfig);
   const saveModelConfig = useSettingsStore((s) => s.saveModelConfig);
   const updateModelConfig = useSettingsStore((s) => s.updateModelConfig);
-  const deleteModelConfigFromStore = useSettingsStore(
-    (s) => s.deleteModelConfig,
-  );
+  const deleteModelConfigFromStore = useSettingsStore((s) => s.deleteModelConfig);
   const testConnection = useSettingsStore((s) => s.testConnection);
   const regexPresets = useSettingsStore((s) => s.regexPresets);
   const activeRegexPresetId = useSettingsStore((s) => s.activeRegexPresetId);
   const loadRegexRules = useSettingsStore((s) => s.loadRegexRules);
   const createRegexPreset = useSettingsStore((s) => s.createRegexPreset);
   const updateRegexPreset = useSettingsStore((s) => s.updateRegexPreset);
-  const deleteRegexPresetFromStore = useSettingsStore(
-    (s) => s.deleteRegexPreset,
-  );
+  const deleteRegexPresetFromStore = useSettingsStore((s) => s.deleteRegexPreset);
   const setActiveRegexPreset = useSettingsStore((s) => s.setActiveRegexPreset);
   const addRegexRule = useSettingsStore((s) => s.addRegexRule);
   const updateRegexRuleFromStore = useSettingsStore((s) => s.updateRegexRule);
@@ -188,23 +142,30 @@ export function SettingsPage() {
   const [easterEggClicks, setEasterEggClicks] = useState(0);
   const [secretUnlocked, setSecretUnlocked] = useState(false);
 
-  setFormName = setName;
-  setFormBaseUrl = setBaseUrl;
-  setFormApiKey = setApiKey;
-  setFormModel = setModel;
-  setFormTemperature = setTemperature;
-  setFormMaxTokens = setMaxTokens;
-  setFormReasoningEffort = setReasoningEffort;
-  setFormStreamingEnabled = setStreamingEnabled;
+  const fillForm = (cfg: {
+    name: string;
+    baseUrl: string;
+    apiKey: string;
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    reasoningEffort?: string;
+    streamingEnabled?: boolean;
+  }) => {
+    setName(cfg.name);
+    setBaseUrl(cfg.baseUrl);
+    setApiKey(cfg.apiKey);
+    setModel(cfg.model);
+    setTemperature(String(cfg.temperature));
+    setMaxTokens(String(cfg.maxTokens));
+    setReasoningEffort(cfg.reasoningEffort || "");
+    setStreamingEnabled(cfg.streamingEnabled !== false);
+  };
 
-  const [selectedRegexPresetId, setSelectedRegexPresetId] = useState<
-    string | null
-  >(null);
+  const [selectedRegexPresetId, setSelectedRegexPresetId] = useState<string | null>(null);
   const [regexPresetName, setRegexPresetName] = useState("");
   const [regexPresetDesc, setRegexPresetDesc] = useState("");
-  const [regexDeleteTarget, setRegexDeleteTarget] = useState<
-    (typeof regexPresets)[0] | null
-  >(null);
+  const [regexDeleteTarget, setRegexDeleteTarget] = useState<(typeof regexPresets)[0] | null>(null);
 
   const [regexName, setRegexName] = useState("");
   const [regexPattern, setRegexPattern] = useState("");
@@ -249,7 +210,7 @@ export function SettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadAllConfigs, loadRegexRules]);
 
   const applyConfigSelection = (id: string) => {
     setSelectedId(id);
@@ -278,10 +239,7 @@ export function SettingsPage() {
         toast("error", "Please enter your DeepSeek API key first.");
         return;
       }
-      if (
-        selectedId !== "__new__" &&
-        modelConfigs.some((c) => c.id === selectedId)
-      ) {
+      if (selectedId !== "__new__" && modelConfigs.some((c) => c.id === selectedId)) {
         await updateModelConfig(selectedId, {
           baseUrl: nextBaseUrl,
           apiKey: nextApiKey,
@@ -371,27 +329,18 @@ export function SettingsPage() {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = (await response.json()) as { data?: Array<{ id: string }> };
-      const models = (data.data || [])
-        .map((m) => m.id)
-        .sort((a, b) => a.localeCompare(b));
+      const models = (data.data || []).map((m) => m.id).sort((a, b) => a.localeCompare(b));
       if (models.length === 0) {
         toast("error", "No DeepSeek models returned from API");
         return;
       }
       setAvailableModels(models);
       if (!model || !models.includes(model)) {
-        setModel(
-          models.includes(DEFAULT_DEEPSEEK_MODEL)
-            ? DEFAULT_DEEPSEEK_MODEL
-            : models[0],
-        );
+        setModel(models.includes(DEFAULT_DEEPSEEK_MODEL) ? DEFAULT_DEEPSEEK_MODEL : models[0]);
       }
       toast("success", t("api.toast.modelsLoaded", { count: models.length }));
     } catch (err) {
-      toast(
-        "error",
-        t("api.toast.modelsFetchFailed", { message: (err as Error).message }),
-      );
+      toast("error", t("api.toast.modelsFetchFailed", { message: (err as Error).message }));
     } finally {
       setFetchingModels(false);
     }
@@ -413,11 +362,8 @@ export function SettingsPage() {
     setSection("context");
   };
 
-  const selectedRegexPreset =
-    regexPresets.find((p) => p.id === selectedRegexPresetId) ?? null;
-  const selectedRules = selectedRegexPreset
-    ? [...selectedRegexPreset.rules]
-    : [];
+  const selectedRegexPreset = regexPresets.find((p) => p.id === selectedRegexPresetId) ?? null;
+  const selectedRules = selectedRegexPreset ? [...selectedRegexPreset.rules] : [];
   const fetchedModelOptions = availableModels.map((id) => ({
     id,
     label: id,
@@ -453,9 +399,7 @@ export function SettingsPage() {
           ...baseModelOptions,
         ]
       : baseModelOptions;
-  const selectedModelMeta = baseModelOptions.find(
-    (option) => option.id === model,
-  );
+  const selectedModelMeta = baseModelOptions.find((option) => option.id === model);
   const isLegacyDeepSeekModel = DEEPSEEK_LEGACY_MODELS.includes(model);
 
   const handleSelectRegexPreset = (id: string) => {
@@ -511,15 +455,9 @@ export function SettingsPage() {
 
   const handleActivateRegexPreset = async () => {
     if (!selectedRegexPresetId) return;
-    const newId =
-      activeRegexPresetId === selectedRegexPresetId
-        ? null
-        : selectedRegexPresetId;
+    const newId = activeRegexPresetId === selectedRegexPresetId ? null : selectedRegexPresetId;
     await setActiveRegexPreset(newId);
-    toast(
-      "info",
-      newId ? `Activated "${selectedRegexPreset?.name}"` : "Deactivated",
-    );
+    toast("info", newId ? `Activated "${selectedRegexPreset?.name}"` : "Deactivated");
   };
 
   const handleToggleGlobalRegex = async () => {
@@ -527,12 +465,7 @@ export function SettingsPage() {
     await updateRegexPreset(selectedRegexPresetId, {
       isGlobal: !selectedRegexPreset.isGlobal,
     });
-    toast(
-      "info",
-      selectedRegexPreset.isGlobal
-        ? "Removed global flag"
-        : "Set as global regex",
-    );
+    toast("info", selectedRegexPreset.isGlobal ? "Removed global flag" : "Set as global regex");
   };
 
   const resetRuleForm = () => {
@@ -612,28 +545,14 @@ export function SettingsPage() {
 
   return (
     <div className="flex h-full">
-      <div className="w-48 border-r p-4 flex flex-col gap-1">
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4 px-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {t("back")}
-        </button>
-        {sections.map((s) => (
-          <button
-            key={s.key}
-            onClick={() =>
-              s.key === "context" ? handleContextEasterEgg() : setSection(s.key)
-            }
-            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors
-              ${section === s.key ? "bg-accent text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"}`}
-          >
-            <s.icon className="h-4 w-4" />
-            {s.label}
-          </button>
-        ))}
-      </div>
+      <SettingsSidebar
+        section={section}
+        sections={sections}
+        onSelect={setSection}
+        onBack={() => navigate("/")}
+        onContextClick={handleContextEasterEgg}
+        t={t}
+      />
 
       <div className="flex-1 p-6 overflow-auto">
         {section === "api" && (
@@ -649,36 +568,22 @@ export function SettingsPage() {
                     <Plug className="h-6 w-6" />
                     {t("api.deepseekConnection")}
                   </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {t("api.description")}
-                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">{t("api.description")}</p>
                 </div>
               </div>
               <div className="grid gap-2 text-xs sm:grid-cols-2 lg:min-w-[340px]">
                 <div className="rounded-md border px-3 py-2">
-                  <p className="text-muted-foreground">
-                    {t("api.officialBase")}
-                  </p>
-                  <p className="mt-1 truncate font-mono text-foreground">
-                    {DEEPSEEK_BASE_URL}
-                  </p>
+                  <p className="text-muted-foreground">{t("api.officialBase")}</p>
+                  <p className="mt-1 truncate font-mono text-foreground">{DEEPSEEK_BASE_URL}</p>
                 </div>
                 <div className="rounded-md border px-3 py-2">
-                  <p className="text-muted-foreground">
-                    {t("api.currentDefault")}
-                  </p>
-                  <p className="mt-1 truncate font-mono text-foreground">
-                    {DEFAULT_DEEPSEEK_MODEL}
-                  </p>
+                  <p className="text-muted-foreground">{t("api.currentDefault")}</p>
+                  <p className="mt-1 truncate font-mono text-foreground">{DEFAULT_DEEPSEEK_MODEL}</p>
                 </div>
               </div>
             </div>
 
-            {!loaded && (
-              <p className="text-sm text-muted-foreground animate-pulse">
-                {t("api.loading")}
-              </p>
-            )}
+            {!loaded && <p className="text-sm text-muted-foreground animate-pulse">{t("api.loading")}</p>}
 
             <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
               <Card>
@@ -687,9 +592,7 @@ export function SettingsPage() {
                     <KeyRound className="h-5 w-5" />
                     {t("api.connectionProfile")}
                   </CardTitle>
-                  <CardDescription>
-                    {t("api.profileDescription")}
-                  </CardDescription>
+                  <CardDescription>{t("api.profileDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
@@ -719,25 +622,18 @@ export function SettingsPage() {
                         </Button>
                       )}
                     </div>
-                    {selectedId !== "__new__" &&
-                      activeConfigId === selectedId && (
-                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                          {t("api.active")}
-                        </p>
-                      )}
+                    {selectedId !== "__new__" && activeConfigId === selectedId && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">{t("api.active")}</p>
+                    )}
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <Label htmlFor="config-name">
-                        {t("api.profileName")}
-                      </Label>
+                      <Label htmlFor="config-name">{t("api.profileName")}</Label>
                       <Input
                         id="config-name"
                         value={name}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setName(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
                         placeholder={DEFAULT_DEEPSEEK_MODEL}
                       />
                     </div>
@@ -747,9 +643,7 @@ export function SettingsPage() {
                         id="api-key"
                         type="password"
                         value={apiKey}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setApiKey(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
                         placeholder={t("api.apiKeyPlaceholder")}
                       />
                     </div>
@@ -758,11 +652,7 @@ export function SettingsPage() {
                   <div>
                     <div className="flex items-center justify-between gap-2">
                       <Label htmlFor="base-url">{t("api.baseUrl")}</Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setBaseUrl(DEEPSEEK_BASE_URL)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => setBaseUrl(DEEPSEEK_BASE_URL)}>
                         {t("api.useOfficial")}
                       </Button>
                     </div>
@@ -771,16 +661,12 @@ export function SettingsPage() {
                       <Input
                         id="base-url"
                         value={baseUrl}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setBaseUrl(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setBaseUrl(e.target.value)}
                         placeholder={DEEPSEEK_BASE_URL}
                         className="pl-9 font-mono text-xs"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {t("api.baseUrlHint")}
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">{t("api.baseUrlHint")}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -801,27 +687,20 @@ export function SettingsPage() {
                         type="button"
                         onClick={() => {
                           setModel(option.id);
-                          if (!name.trim() || name.startsWith("DeepSeek"))
-                            setName(option.label);
+                          if (!name.trim() || name.startsWith("DeepSeek")) setName(option.label);
                         }}
                         className={`rounded-md border p-3 text-left transition-colors ${model === option.id ? "border-primary bg-primary/10 text-foreground" : "border-border hover:bg-accent/50"}`}
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">
-                            {option.label}
-                          </span>
+                          <span className="text-sm font-medium">{option.label}</span>
                           <span
                             className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${model === option.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                           >
                             {option.badge}
                           </span>
                         </div>
-                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                          {option.id}
-                        </p>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {option.description}
-                        </p>
+                        <p className="mt-1 font-mono text-[11px] text-muted-foreground">{option.id}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{option.description}</p>
                       </button>
                     ))}
                   </div>
@@ -853,9 +732,7 @@ export function SettingsPage() {
                       </Button>
                     </div>
                     {selectedModelMeta && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {selectedModelMeta.description}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedModelMeta.description}</p>
                     )}
                     {availableModels.length > 0 && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -865,9 +742,7 @@ export function SettingsPage() {
                       </p>
                     )}
                     {isLegacyDeepSeekModel && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        {t("api.legacyWarning")}
-                      </p>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">{t("api.legacyWarning")}</p>
                     )}
                   </div>
                 </CardContent>
@@ -880,9 +755,7 @@ export function SettingsPage() {
                   <SlidersHorizontal className="h-5 w-5" />
                   {t("api.generationDefaults")}
                 </CardTitle>
-                <CardDescription>
-                  {t("api.generationDescription")}
-                </CardDescription>
+                <CardDescription>{t("api.generationDescription")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-3">
@@ -899,9 +772,7 @@ export function SettingsPage() {
                     <Input
                       id="temperature"
                       value={temperature}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setTemperature(e.target.value)
-                      }
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTemperature(e.target.value)}
                       placeholder={t("api.temperaturePlaceholder")}
                       type="number"
                       step="0.1"
@@ -922,9 +793,7 @@ export function SettingsPage() {
                     <Input
                       id="max-tokens"
                       value={maxTokens}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        setMaxTokens(e.target.value)
-                      }
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMaxTokens(e.target.value)}
                       placeholder={t("api.maxTokensPlaceholder")}
                       type="number"
                       min="1"
@@ -932,9 +801,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="reasoning-effort">
-                      {t("api.reasoningEffort")}
-                    </Label>
+                    <Label htmlFor="reasoning-effort">{t("api.reasoningEffort")}</Label>
                     <select
                       id="reasoning-effort"
                       value={reasoningEffort}
@@ -950,15 +817,11 @@ export function SettingsPage() {
 
                 <div className="grid gap-2 text-xs md:grid-cols-3">
                   <div className="rounded-md border px-3 py-2">
-                    <p className="text-muted-foreground">
-                      {t("api.contextLength")}
-                    </p>
+                    <p className="text-muted-foreground">{t("api.contextLength")}</p>
                     <p className="mt-1 text-sm font-semibold">1M tokens</p>
                   </div>
                   <div className="rounded-md border px-3 py-2">
-                    <p className="text-muted-foreground">
-                      {t("api.maxOutput")}
-                    </p>
+                    <p className="text-muted-foreground">{t("api.maxOutput")}</p>
                     <p className="mt-1 text-sm font-semibold">384K tokens</p>
                   </div>
                   <div className="rounded-md border px-3 py-2">
@@ -970,9 +833,7 @@ export function SettingsPage() {
                 <div className="flex items-center justify-between gap-4 rounded-md border px-3 py-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium">{t("api.streaming")}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t("api.streamingHint")}
-                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("api.streamingHint")}</p>
                   </div>
                   <SwitchButton
                     checked={streamingEnabled}
@@ -982,11 +843,7 @@ export function SettingsPage() {
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <Button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="flex-1"
-                  >
+                  <Button onClick={handleSave} disabled={saving} className="flex-1">
                     <Save className="h-4 w-4 mr-2" />
                     {saving ? t("api.saving") : t("api.saveProfile")}
                   </Button>
@@ -1005,162 +862,10 @@ export function SettingsPage() {
           </div>
         )}
 
-        {section === "appearance" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {theme === "dark" ? (
-                  <Moon className="h-5 w-5" />
-                ) : (
-                  <Sun className="h-5 w-5" />
-                )}
-                {t("appearance.title")}
-              </CardTitle>
-              <CardDescription>{t("appearance.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                {themes.map((t) => (
-                  <button
-                    key={t.value}
-                    onClick={() => setTheme(t.value)}
-                    className={`relative flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors
-                      ${theme === t.value ? "border-primary bg-primary/10 text-primary" : "border-border hover:bg-accent hover:text-accent-foreground"}`}
-                  >
-                    {theme === t.value && (
-                      <CheckCircle2 className="absolute right-2 top-2 h-3.5 w-3.5" />
-                    )}
-                    <t.icon className="h-5 w-5" />
-                    <span className="text-sm font-medium">{t.label}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
-                {(() => {
-                  const resolvedLabel =
-                    resolvedTheme === "dark"
-                      ? t("appearance.dark")
-                      : resolvedTheme === "sepia"
-                        ? t("appearance.eyeCare")
-                        : t("appearance.light");
-                  return t("appearance.activeAppearance", {
-                    value:
-                      theme === "system"
-                        ? t("appearance.systemResolved", {
-                            resolved: resolvedLabel,
-                          })
-                        : theme === "sepia"
-                          ? t("appearance.eyeCare")
-                          : theme === "dark"
-                            ? t("appearance.dark")
-                            : t("appearance.light"),
-                  });
-                })()}
-              </div>
-              <div className="rounded-md border px-3 py-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">
-                      {t("appearance.language")}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {t("appearance.languageHint")}
-                    </p>
-                  </div>
-                  <select
-                    value={locale}
-                    onChange={(e) => {
-                      const next = e.target.value as Locale;
-                      setLocale(next);
-                      changeLocale(next);
-                    }}
-                    className="h-8 rounded-md border border-input bg-transparent px-2 py-0.5 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="zh">中文</option>
-                    <option value="en">English</option>
-                  </select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {section === "appearance" && <AppearanceSection themes={themes} locale={locale} setLocale={setLocale} t={t} />}
 
         {section === "context" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <SlidersHorizontal className="h-5 w-5" />
-                {t("context.title")}
-              </CardTitle>
-              <CardDescription>{t("context.description")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <input
-                  type="range"
-                  min="0"
-                  max="131072"
-                  step="512"
-                  value={contextTokens}
-                  onChange={(e) => setContextTokens(parseInt(e.target.value))}
-                  className="flex-1 h-2 rounded-full appearance-none bg-muted-foreground/20 cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
-                />
-                <span className="text-2xl font-bold tabular-nums min-w-[70px] text-center">
-                  {contextTokens === 0
-                    ? "∞"
-                    : contextTokens >= 1000
-                      ? (contextTokens / 1000).toFixed(
-                          contextTokens % 1000 === 0 ? 0 : 1,
-                        ) + "k"
-                      : contextTokens}
-                </span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>∞</span>
-                <span>32k</span>
-                <span>64k</span>
-                <span>128k</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {[
-                  {
-                    label: t("context.presets.minimal"),
-                    value: 2048,
-                    desc: t("context.presetDescs.minimal"),
-                  },
-                  {
-                    label: t("context.presets.short"),
-                    value: 8192,
-                    desc: t("context.presetDescs.short"),
-                  },
-                  {
-                    label: t("context.presets.medium"),
-                    value: 32768,
-                    desc: t("context.presetDescs.medium"),
-                  },
-                  {
-                    label: t("context.presets.full"),
-                    value: 0,
-                    desc: t("context.presetDescs.full"),
-                  },
-                ].map((preset) => (
-                  <button
-                    key={preset.value}
-                    onClick={() => setContextTokens(preset.value)}
-                    className={`rounded-lg border p-2 text-center transition-colors ${contextTokens === preset.value ? "border-primary bg-primary/10" : "border-border hover:bg-accent"}`}
-                  >
-                    <p className="text-xs font-medium">{preset.label}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {preset.desc}
-                    </p>
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground mt-4">
-                {t("context.tokenEstimate")}
-              </p>
-            </CardContent>
-          </Card>
+          <ContextSection contextTokens={contextTokens} setContextTokens={setContextTokens} t={t} />
         )}
 
         {section === "regex" && (
@@ -1170,21 +875,14 @@ export function SettingsPage() {
                 <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {t("regex.presets")}
                 </h2>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6"
-                  onClick={handleCreateRegexPreset}
-                >
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={handleCreateRegexPreset}>
                   <Plus className="h-3.5 w-3.5" />
                 </Button>
               </div>
               <ScrollArea className="flex-1 -mx-2 px-2">
                 <div className="flex flex-col gap-0.5">
                   {regexPresets.length === 0 && (
-                    <p className="text-xs text-muted-foreground p-2">
-                      {t("regex.noPresets")}
-                    </p>
+                    <p className="text-xs text-muted-foreground p-2">{t("regex.noPresets")}</p>
                   )}
                   {regexPresets.map((p) => (
                     <button
@@ -1194,9 +892,7 @@ export function SettingsPage() {
                         ${selectedRegexPresetId === p.id ? "bg-accent text-foreground font-medium" : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"}`}
                     >
                       <span className="truncate text-xs">{p.name}</span>
-                      {activeRegexPresetId === p.id && (
-                        <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500" />
-                      )}
+                      {activeRegexPresetId === p.id && <CheckCircle2 className="h-3 w-3 shrink-0 text-green-500" />}
                     </button>
                   ))}
                 </div>
@@ -1208,11 +904,7 @@ export function SettingsPage() {
                 <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
                   <div className="text-center space-y-2">
                     <p>{t("regex.selectOrCreate")}</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCreateRegexPreset}
-                    >
+                    <Button variant="outline" size="sm" onClick={handleCreateRegexPreset}>
                       <Plus className="h-3.5 w-3.5 mr-1" />
                       {t("regex.newPreset")}
                     </Button>
@@ -1225,36 +917,24 @@ export function SettingsPage() {
                       <div className="flex-1 space-y-1.5">
                         <Input
                           value={regexPresetName}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setRegexPresetName(e.target.value)
-                          }
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegexPresetName(e.target.value)}
                           className="border-0 border-b rounded-none px-0 h-auto text-lg font-bold focus-visible:ring-0"
                           placeholder={t("regex.namePlaceholder")}
                         />
                         <Input
                           value={regexPresetDesc}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                            setRegexPresetDesc(e.target.value)
-                          }
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegexPresetDesc(e.target.value)}
                           className="border-0 border-b rounded-none px-0 h-auto text-xs text-muted-foreground focus-visible:ring-0"
                           placeholder={t("regex.descPlaceholder")}
                         />
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleSaveRegexPresetMeta}
-                        >
+                        <Button size="sm" variant="outline" onClick={handleSaveRegexPresetMeta}>
                           {t("regex.save")}
                         </Button>
                         <Button
                           size="sm"
-                          variant={
-                            selectedRegexPreset?.isGlobal
-                              ? "default"
-                              : "outline"
-                          }
+                          variant={selectedRegexPreset?.isGlobal ? "default" : "outline"}
                           onClick={handleToggleGlobalRegex}
                           title={t("regex.toggleGlobal")}
                         >
@@ -1262,24 +942,16 @@ export function SettingsPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant={
-                            activeRegexPresetId === selectedRegexPresetId
-                              ? "default"
-                              : "outline"
-                          }
+                          variant={activeRegexPresetId === selectedRegexPresetId ? "default" : "outline"}
                           onClick={handleActivateRegexPreset}
                         >
-                          {activeRegexPresetId === selectedRegexPresetId
-                            ? t("regex.active")
-                            : t("regex.activate")}
+                          {activeRegexPresetId === selectedRegexPresetId ? t("regex.active") : t("regex.activate")}
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="text-destructive"
-                          onClick={() =>
-                            setRegexDeleteTarget(selectedRegexPreset)
-                          }
+                          onClick={() => setRegexDeleteTarget(selectedRegexPreset)}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -1294,9 +966,7 @@ export function SettingsPage() {
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <Input
                         value={regexName}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setRegexName(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegexName(e.target.value)}
                         placeholder={t("regex.ruleNamePlaceholder")}
                         className="text-xs"
                       />
@@ -1327,41 +997,30 @@ export function SettingsPage() {
                               className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${regexStrip ? "translate-x-[14px]" : "translate-x-[2px]"}`}
                             />
                           </button>
-                          <span className="text-[10px]">
-                            {t("regex.strip")}
-                          </span>
+                          <span className="text-[10px]">{t("regex.strip")}</span>
                         </label>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <Input
                         value={regexPattern}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setRegexPattern(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegexPattern(e.target.value)}
                         placeholder={t("regex.patternPlaceholder")}
                         className="font-mono text-[10px]"
                       />
                       <Input
                         value={regexTemplate}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          setRegexTemplate(e.target.value)
-                        }
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRegexTemplate(e.target.value)}
                         placeholder={t("regex.templatePlaceholder")}
                         className="font-mono text-[10px]"
                       />
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" onClick={handleSaveRule}>
-                        {editingRuleId ? t("regex.update") : t("regex.add")}{" "}
-                        Rule
+                        {editingRuleId ? t("regex.update") : t("regex.add")} Rule
                       </Button>
                       {editingRuleId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={resetRuleForm}
-                        >
+                        <Button size="sm" variant="outline" onClick={resetRuleForm}>
                           {t("regex.cancel")}
                         </Button>
                       )}
@@ -1386,9 +1045,7 @@ export function SettingsPage() {
                   <ScrollArea className="flex-1 p-4">
                     <div className="space-y-1.5">
                       {selectedRules.length === 0 && (
-                        <p className="text-xs text-muted-foreground p-2">
-                          {t("regex.noRules")}
-                        </p>
+                        <p className="text-xs text-muted-foreground p-2">{t("regex.noRules")}</p>
                       )}
                       {selectedRules.map((rule) => (
                         <div
@@ -1408,25 +1065,16 @@ export function SettingsPage() {
                           </button>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-medium truncate">
-                                {rule.name}
-                              </span>
+                              <span className="text-xs font-medium truncate">{rule.name}</span>
                               {rule.stripFromPrompt && (
                                 <span className="text-[8px] bg-muted px-1 py-0.5 rounded font-mono shrink-0">
                                   {t("regex.strip")}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] font-mono text-muted-foreground truncate">
-                              {rule.pattern}
-                            </p>
+                            <p className="text-[10px] font-mono text-muted-foreground truncate">{rule.pattern}</p>
                           </div>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6"
-                            onClick={() => startEditRule(rule)}
-                          >
+                          <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => startEditRule(rule)}>
                             <span className="text-[10px]">✎</span>
                           </Button>
                           <Button
@@ -1447,23 +1095,16 @@ export function SettingsPage() {
           </div>
         )}
 
-        <Dialog
-          open={!!regexDeleteTarget}
-          onOpenChange={() => setRegexDeleteTarget(null)}
-        >
+        <Dialog open={!!regexDeleteTarget} onOpenChange={() => setRegexDeleteTarget(null)}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete Regex Preset</DialogTitle>
               <DialogDescription>
-                Delete "{regexDeleteTarget?.name}" and all its rules? This
-                cannot be undone.
+                Delete "{regexDeleteTarget?.name}" and all its rules? This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setRegexDeleteTarget(null)}
-              >
+              <Button variant="outline" onClick={() => setRegexDeleteTarget(null)}>
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDeleteRegexPreset}>
