@@ -39,10 +39,12 @@ export function HomePage() {
   const [contextMenu, setContextMenu] = useState<HomeContextMenu | null>(null);
   const charactersById = useMemo(() => new Map(characters.map((char) => [char.id, char])), [characters]);
 
+  // Data is loaded by App.tsx seed; HomePage just reacts
   useEffect(() => {
-    loadCharacters();
-    loadChats();
-  }, [loadCharacters, loadChats]);
+    if (characters.length === 0 && !charsLoading) loadCharacters();
+    if (chats.length === 0 && !chatsLoading) loadChats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!contextMenu) return;

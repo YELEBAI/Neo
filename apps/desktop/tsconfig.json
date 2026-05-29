@@ -11,13 +11,13 @@
       "@neo-tavern/core": ["../../packages/core/src/index.ts"],
       "@neo-tavern/core/*": ["../../packages/core/src/*"],
       "@neo-tavern/ui": ["../../packages/ui/src/index.ts"],
-      "@neo-tavern/ui/*": ["../../packages/ui/src/*"]
-    }
+      "@neo-tavern/ui/*": ["../../packages/ui/src/*"],
+    },
   },
   "include": ["src"],
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/core" },
-    { "path": "../../packages/ui" }
-  ]
+    { "path": "../../packages/ui" },
+  ],
 }

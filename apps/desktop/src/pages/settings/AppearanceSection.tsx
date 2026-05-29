@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Sun, Moon, Eye, CheckCircle2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@neo-tavern/ui";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from "@neo-tavern/ui";
 import { useThemeStore } from "@/app/theme.store";
 import { changeLocale, type Locale } from "@/i18n";
+import { getStorageItem, setStorageItem } from "@/db/storage";
 import type { ThemeOption } from "./types";
 
 interface AppearanceSectionProps {
@@ -15,6 +17,20 @@ export function AppearanceSection({ themes, locale, setLocale, t }: AppearanceSe
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const [lanEnabled, setLanEnabled] = useState(false);
+  const [lanAddr, setLanAddr] = useState("0.0.0.0");
+  const [lanPort, setLanPort] = useState("3000");
+
+  useEffect(() => {
+    (async () => {
+      const en = await getStorageItem("neotavern_lan_enabled");
+      const ad = await getStorageItem("neotavern_lan_addr");
+      const po = await getStorageItem("neotavern_lan_port");
+      setLanEnabled(en === "true");
+      if (ad) setLanAddr(ad);
+      if (po) setLanPort(po);
+    })();
+  }, []);
 
   const resolvedLabel =
     resolvedTheme === "dark"
@@ -82,6 +98,60 @@ export function AppearanceSection({ themes, locale, setLocale, t }: AppearanceSe
               <option value="en">English</option>
             </select>
           </div>
+        </div>
+
+        {/* ── LAN Server ──────────────────────────── */}
+        <div className="rounded-md border px-3 py-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">{t("appearance.lanServer")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("appearance.lanEnable")}</p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={lanEnabled}
+              onClick={async () => {
+                const next = !lanEnabled;
+                setLanEnabled(next);
+                await setStorageItem("neotavern_lan_enabled", String(next));
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${lanEnabled ? "bg-primary" : "bg-muted-foreground/30"}`}
+            >
+              <span
+                className={`inline-block h-5 w-5 rounded-full bg-background shadow-sm transition-transform ${lanEnabled ? "translate-x-5" : "translate-x-0.5"}`}
+              />
+            </button>
+          </div>
+          {lanEnabled && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs">{t("appearance.lanAddr")}</Label>
+                  <Input
+                    value={lanAddr}
+                    onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                      setLanAddr(e.target.value);
+                      await setStorageItem("neotavern_lan_addr", e.target.value);
+                    }}
+                    className="h-7 text-xs mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">{t("appearance.lanPort")}</Label>
+                  <Input
+                    value={lanPort}
+                    onChange={async (e: React.ChangeEvent<HTMLInputElement>) => {
+                      setLanPort(e.target.value);
+                      await setStorageItem("neotavern_lan_port", e.target.value);
+                    }}
+                    className="h-7 text-xs mt-1"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-foreground">{t("appearance.lanRestartHint")}</p>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

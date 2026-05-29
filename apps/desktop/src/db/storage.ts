@@ -67,6 +67,56 @@ async function appStoreGet(key: string): Promise<string | null> {
   }
 }
 
+// ── REST fallback (LAN browser shares Tauri store.json) ─
+
+async function restGet(key: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(key)}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { value?: string };
+    return data.value ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function restSet(key: string, value: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function restRemove(key: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/store/${encodeURIComponent(key)}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function restEntries(prefix: string): Promise<Record<string, string> | null> {
+  try {
+    const res = await fetch("/api/store");
+    if (!res.ok) return null;
+    const entries = (await res.json()) as [string, string][];
+    const result: Record<string, string> = {};
+    for (const [k, v] of entries) {
+      if (k.startsWith(prefix)) result[k] = v;
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 async function appStoreSet(key: string, value: string): Promise<boolean> {
   if (appStoreAvailable === false) return false;
   try {
@@ -125,23 +175,27 @@ export async function migrateLocalStorageToAppStore(prefix = STORAGE_PREFIX) {
 }
 
 export async function getStorageItem(key: string): Promise<string | null> {
+  // 1. Tauri invoke
   const stored = await appStoreGet(key);
   if (stored != null) return stored;
 
-  const legacy = localGetItem(key);
-  if (legacy != null && appStoreAvailable !== false) {
-    await appStoreSet(key, legacy);
-  }
-  return legacy;
+  // 2. REST API (LAN browser sharing store.json)
+  const restValue = await restGet(key);
+  if (restValue != null) return restValue;
+
+  // 3. localStorage fallback
+  return localGetItem(key);
 }
 
 export async function setStorageItem(key: string, value: string): Promise<void> {
   if (await appStoreSet(key, value)) return;
+  if (await restSet(key, value)) return;
   localSetItem(key, value);
 }
 
 export async function removeStorageItem(key: string): Promise<void> {
   if (await appStoreRemove(key)) return;
+  if (await restRemove(key)) return;
   localRemoveItem(key);
 }
 
@@ -150,5 +204,7 @@ export async function getStorageEntries(prefix = STORAGE_PREFIX): Promise<Record
   if (stored) {
     return Object.fromEntries(Object.entries(stored).filter(([key]) => key.startsWith(prefix)));
   }
+  const restEntries_ = await restEntries(prefix);
+  if (restEntries_) return restEntries_;
   return localEntries(prefix);
 }

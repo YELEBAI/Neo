@@ -94,7 +94,12 @@
     "eyeCare": "Eye Care",
     "systemResolved": "System ({{resolved}})",
     "language": "Language",
-    "languageHint": "Changes take effect immediately."
+    "languageHint": "Changes take effect immediately.",
+    "lanServer": "LAN Server",
+    "lanEnable": "Allow other devices on your local network to access NeoTavern via browser.",
+    "lanAddr": "Listen address",
+    "lanPort": "Port",
+    "lanRestartHint": "Restart the app after changing these settings."
   },
   "context": {
     "title": "Context Tokens",

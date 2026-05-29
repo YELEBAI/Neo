@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "pnpm --filter @neo-tavern/desktop dev",
     "build": "pnpm --filter @neo-tavern/desktop build",
+    "build:desktop": "pnpm --filter @neo-tavern/desktop tauri build",
     "tauri": "pnpm --filter @neo-tavern/desktop tauri",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
