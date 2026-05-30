@@ -13,6 +13,7 @@ import { ToastContainer, useToast } from "@neo-tavern/ui";
 import { useSettingsStore } from "@/features/settings/settings.store";
 import { useWorldbookStore } from "@/features/settings/worldbook.store";
 import { migrateLocalStorageToAppStore } from "@/db/storage";
+import { LoginGate } from "@/components/LoginGate";
 import { useThemeStore } from "./theme.store";
 
 let seeded = false;
@@ -53,5 +54,9 @@ function AppContent() {
 }
 
 export function App() {
-  return <AppContent />;
+  return (
+    <LoginGate>
+      <AppContent />
+    </LoginGate>
+  );
 }

@@ -71,9 +71,12 @@ async function appStoreGet(key: string): Promise<string | null> {
 
 async function restGet(key: string): Promise<string | null> {
   try {
-    const res = await fetch(`/api/store/${encodeURIComponent(key)}`);
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = sessionStorage.getItem("neo_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`/api/store/${encodeURIComponent(key)}`, { headers });
     if (!res.ok) return null;
-    const data = (await res.json()) as { value?: string };
+    const data = (await res.json()) as { value?: string | null };
     return data.value ?? null;
   } catch {
     return null;
@@ -82,9 +85,12 @@ async function restGet(key: string): Promise<string | null> {
 
 async function restSet(key: string, value: string): Promise<boolean> {
   try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = sessionStorage.getItem("neo_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(`/api/store/${encodeURIComponent(key)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ value }),
     });
     return res.ok;
@@ -95,7 +101,10 @@ async function restSet(key: string, value: string): Promise<boolean> {
 
 async function restRemove(key: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/store/${encodeURIComponent(key)}`, { method: "DELETE" });
+    const headers: Record<string, string> = {};
+    const token = sessionStorage.getItem("neo_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch(`/api/store/${encodeURIComponent(key)}`, { method: "DELETE", headers });
     return res.ok;
   } catch {
     return false;
@@ -104,7 +113,10 @@ async function restRemove(key: string): Promise<boolean> {
 
 async function restEntries(prefix: string): Promise<Record<string, string> | null> {
   try {
-    const res = await fetch("/api/store");
+    const headers: Record<string, string> = {};
+    const token = sessionStorage.getItem("neo_token");
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    const res = await fetch("/api/store", { headers });
     if (!res.ok) return null;
     const entries = (await res.json()) as [string, string][];
     const result: Record<string, string> = {};

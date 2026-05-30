@@ -99,7 +99,10 @@
     "lanEnable": "启用以允许局域网内的其他设备通过浏览器访问。",
     "lanAddr": "监听地址",
     "lanPort": "端口",
-    "lanRestartHint": "修改后需重启应用生效。"
+    "lanRestartHint": "修改后需重启应用生效。",
+    "lanPassword": "访问密码",
+    "lanPasswordHint": "局域网内其他设备访问时需要输入此密码。",
+    "lanPasswordGenerate": "重新生成"
   },
   "context": {
     "title": "上下文 Token",

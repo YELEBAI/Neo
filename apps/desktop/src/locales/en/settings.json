@@ -99,7 +99,10 @@
     "lanEnable": "Allow other devices on your local network to access NeoTavern via browser.",
     "lanAddr": "Listen address",
     "lanPort": "Port",
-    "lanRestartHint": "Restart the app after changing these settings."
+    "lanRestartHint": "Restart the app after changing these settings.",
+    "lanPassword": "Access Password",
+    "lanPasswordHint": "Other devices on your LAN will need this password to connect.",
+    "lanPasswordGenerate": "Regenerate"
   },
   "context": {
     "title": "Context Tokens",

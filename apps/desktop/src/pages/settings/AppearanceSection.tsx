@@ -20,17 +20,30 @@ export function AppearanceSection({ themes, locale, setLocale, t }: AppearanceSe
   const [lanEnabled, setLanEnabled] = useState(false);
   const [lanAddr, setLanAddr] = useState("0.0.0.0");
   const [lanPort, setLanPort] = useState("3000");
+  const [lanPassword, setLanPassword] = useState("");
 
   useEffect(() => {
     (async () => {
       const en = await getStorageItem("neotavern_lan_enabled");
       const ad = await getStorageItem("neotavern_lan_addr");
       const po = await getStorageItem("neotavern_lan_port");
+      const pw = await getStorageItem("neotavern_lan_password");
       setLanEnabled(en === "true");
       if (ad) setLanAddr(ad);
       if (po) setLanPort(po);
+      if (pw) setLanPassword(pw);
     })();
   }, []);
+
+  const handleRegenPassword = async () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&";
+    let pw = "";
+    const buf = new Uint32Array(12);
+    crypto.getRandomValues(buf);
+    for (let i = 0; i < 12; i++) pw += chars[buf[i] % chars.length];
+    setLanPassword(pw);
+    await setStorageItem("neotavern_lan_password", pw);
+  };
 
   const resolvedLabel =
     resolvedTheme === "dark"
@@ -150,6 +163,21 @@ export function AppearanceSection({ themes, locale, setLocale, t }: AppearanceSe
                 </div>
               </div>
               <p className="text-[10px] text-muted-foreground">{t("appearance.lanRestartHint")}</p>
+              <div className="pt-2 border-t">
+                <Label className="text-xs">{t("appearance.lanPassword")}</Label>
+                <p className="text-[10px] text-muted-foreground mb-1">{t("appearance.lanPasswordHint")}</p>
+                <div className="flex gap-2">
+                  <Input value={lanPassword} readOnly className="h-7 text-xs font-mono flex-1" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[10px] shrink-0"
+                    onClick={handleRegenPassword}
+                  >
+                    {t("appearance.lanPasswordGenerate")}
+                  </Button>
+                </div>
+              </div>
             </>
           )}
         </div>

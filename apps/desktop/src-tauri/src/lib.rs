@@ -105,7 +105,7 @@ fn try_start_lan_server(handle: tauri::AppHandle) {
     std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let store = read_app_store(&handle).unwrap_or_default();
+            let mut store = read_app_store(&handle).unwrap_or_default();
             let enabled = store
                 .get("neotavern_lan_enabled")
                 .map(|v| v == "true")
@@ -127,6 +127,13 @@ fn try_start_lan_server(handle: tauri::AppHandle) {
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
 
+            // Generate and persist LAN password on first launch
+            if !store.contains_key("neotavern_lan_password") {
+                let pw = random_password();
+                store.insert("neotavern_lan_password".into(), pw);
+                let _ = write_store_to_path(&store, &std::path::PathBuf::from(&store_path));
+            }
+
             let frontend_dir = resolve_frontend_dir(&handle);
             let shared_store: Arc<Mutex<AppStore>> = Arc::new(Mutex::new(store));
 
@@ -137,6 +144,21 @@ fn try_start_lan_server(handle: tauri::AppHandle) {
             }
         });
     });
+}
+
+fn random_password() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&";
+    let mut pw = String::with_capacity(12);
+    for i in 0..12 {
+        let idx = ((seed >> (i * 4)) ^ (seed >> (i * 4 + 16))) as usize % chars.len();
+        pw.push(chars[idx] as char);
+    }
+    pw
 }
 
 fn resolve_frontend_dir(_handle: &tauri::AppHandle) -> String {
